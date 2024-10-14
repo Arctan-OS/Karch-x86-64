@@ -104,7 +104,7 @@ int init_apic() {
 	lapic_refresh_timer(1000);
 
 	uint8_t *data = NULL;
-	size_t max = acpi_get_madt(&data);
+	size_t max = acpi_get_table("APIC", &data);
 	size_t i = 0;
 
 	if (data == NULL || max == 0) {
