@@ -291,8 +291,9 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 	// detected, logged, and put into smp_hold
 	void *code = pmm_low_alloc();
 	void *stack = pmm_low_alloc();
+
 	// NOTE: This is a virtual address
-	void *stack_high = pmm_contig_alloc(2);
+	void *stack_high = alloc(PAGE_SIZE * 2);
 
 	pager_map(ARC_HHDM_TO_PHYS(code), ARC_HHDM_TO_PHYS(code), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
 	pager_map(ARC_HHDM_TO_PHYS(stack), ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);

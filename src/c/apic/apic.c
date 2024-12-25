@@ -111,6 +111,7 @@ int init_apic() {
 		return -1;
 	}
 
+
 	// NOTE: Is it possible for this data to be structured something
 	//       along the lines of:
 	//         - LAPIC
@@ -181,7 +182,7 @@ int init_apic() {
 
 				if (irq != 0) {
 					// The LAPIC timer will be used
-					apic_map_gsi_irq(gsi, irq, bsp, (trigger | (polarity << 1)));
+	//				apic_map_gsi_irq(gsi, irq, bsp, (trigger | (polarity << 1)));
 				}
 
 				break;
@@ -194,7 +195,7 @@ int init_apic() {
 			}
 
 			default: {
-				ARC_DEBUG(INFO, "Unhandled MADT entry of type %d\n", data[i]);
+				ARC_DEBUG(WARN, "Unhandled MADT entry of type %d\n", data[i]);
 				break;
 			}		
 		}

@@ -29,6 +29,7 @@
 #include <global.h>
 #include <arch/x86-64/gdt.h>
 #include <mm/allocator.h>
+#include <lib/util.h>
 
 struct gdt_header {
 	uint16_t size;
@@ -121,6 +122,15 @@ void init_gdt() {
 
 	struct gdt_entry_container *container = (struct gdt_entry_container *)alloc(sizeof(*container));
 
+	if (container == NULL) {
+		ARC_DEBUG(ERR, "Failed to allocate GDT container");
+		memset(Arc_MainTerm.framebuffer, 0, Arc_MainTerm.fb_height * Arc_MainTerm.fb_width * (Arc_MainTerm.fb_bpp / 8));
+		term_draw(&Arc_MainTerm);
+		ARC_HANG;
+	}
+
+	memset(container, 0, sizeof(*container));
+
 	set_gdt_gate(container, 0, 0, 0, 0, 0);
 	set_gdt_gate(container, 1, 0, 0xFFFFFFFF, 0x9A, 0xA); // Kernel Code 64
 	set_gdt_gate(container, 2, 0, 0xFFFFFFFF, 0x92, 0xC); // Kernel Data 32 / 64
@@ -130,6 +140,16 @@ void init_gdt() {
 	ARC_DEBUG(INFO, "Installed basic descriptors\n");
 
 	struct tss_descriptor *tss = (struct tss_descriptor *)alloc(sizeof(*tss));
+
+	if (tss == NULL) {
+		ARC_DEBUG(ERR, "Failed to allocate GDT container");
+		memset(Arc_MainTerm.framebuffer, 0, Arc_MainTerm.fb_height * Arc_MainTerm.fb_width * (Arc_MainTerm.fb_bpp / 8));
+		term_draw(&Arc_MainTerm);
+		ARC_HANG;
+	}
+
+	memset(tss, 0, sizeof(*tss));
+
 	set_tss_gate(container, (uint64_t)tss, sizeof(*tss) - 1, 0x89, 0x0);
 
 	uintptr_t ist = (uintptr_t)alloc(PAGE_SIZE * 2) + (PAGE_SIZE * 2) - 0x8;
@@ -138,6 +158,7 @@ void init_gdt() {
 	tss->ist1_high = (ist >> 32) & UINT32_MAX;
 	tss->rsp0_low = (rsp & UINT32_MAX);
 	tss->rsp0_high = (rsp >> 32) & UINT32_MAX;
+
 	ARC_DEBUG(INFO, "Created TSS\n");
 
 	gdtr.size = sizeof(*container) - 1;
@@ -149,4 +170,5 @@ void init_gdt() {
 	_install_tss(sizeof(container->gdt));
 	ARC_DEBUG(INFO, "Installed TSS\n");
 	ARC_DEBUG(INFO, "Initialized GDT\n");
+
 }
