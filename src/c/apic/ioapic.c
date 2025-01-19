@@ -65,7 +65,7 @@ uint64_t ioapic_read_redir_tbl(struct ioapic_register *ioapic, int table_idx) {
 uint32_t init_ioapic(uint32_t address) {
 	struct ioapic_register *ioapic = (struct ioapic_register *)((uintptr_t)address);
 
-	int map_res = pager_map((uintptr_t)ioapic, (uintptr_t)ioapic, PAGE_SIZE, 1 << ARC_PAGER_4K | ARC_PAGER_PAT_UC);
+	int map_res = pager_map(NULL, (uintptr_t)ioapic, (uintptr_t)ioapic, PAGE_SIZE, 1 << ARC_PAGER_4K | ARC_PAGER_PAT_UC);
 
 	if (map_res != 0 && map_res != -5) {
 		ARC_DEBUG(ERR, "Mapping failed\n");

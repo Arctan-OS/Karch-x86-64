@@ -42,12 +42,14 @@
 #define TWO_MIB 0x200000
 
 struct pager_traverse_info {
+	void *cr3;
 	uintptr_t virtual;
 	uintptr_t physical;
 	size_t size;
 	uint32_t attributes;
 };
 
+// Value current loaded in CR3
 static uint64_t *pml4 = NULL;
 
 uint64_t get_entry_bits(int level, uint32_t attributes) {
@@ -161,7 +163,7 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
  * @return zero on success.
  * */
 static int pager_traverse(struct pager_traverse_info *info, int (*callback)(struct pager_traverse_info *info, uint64_t *table, int index, int level)) {
-	if (info == NULL || pml4 == NULL) {
+	if (info == NULL || info->cr3 == NULL) {
 		return -1;
 	}
 
@@ -172,7 +174,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	uintptr_t target = info->virtual + info->size;
 
 	while (info->virtual < target) {
-		uint64_t *table = pml4;
+		uint64_t *table = info->cr3;
 		int index = get_page_table(table, 4, info->virtual, info->attributes);
 
 		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
@@ -231,14 +233,18 @@ static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table,
 	}
 
 	table[index] = info->physical | get_entry_bits(level, info->attributes);
-	__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
 
 	return 0;
 }
 
-int pager_map(uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attributes) {
+int pager_map(void *cr3, uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attributes) {
 	struct pager_traverse_info info = { .virtual = virtual, .physical = physical,
-	                                    .size = size, .attributes = attributes };
+	                                    .size = size, .attributes = attributes,
+					    .cr3 = cr3 == NULL ? pml4 : cr3 };
 
 	if (pager_traverse(&info, pager_map_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map P0x%"PRIx64":V0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", physical, virtual, size, attributes);
@@ -254,13 +260,16 @@ static int pager_unmap_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	table[index] = 0;
-	__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
 
 	return 0;
 }
 
-int pager_unmap(uintptr_t virtual, size_t size) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size};
+int pager_unmap(void *cr3, uintptr_t virtual, size_t size) {
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .cr3 = cr3 == NULL ? pml4 : cr3};
 
 	if (pager_traverse(&info, pager_unmap_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map V0x%"PRIx64" (0x%"PRIx64" B)\n", virtual, size);
@@ -282,14 +291,17 @@ static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *ta
 	}
 
 	table[index] = ARC_HHDM_TO_PHYS(page) | get_entry_bits(level, info->attributes);
-	__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
 
 	return 0;
 }
 
-int pager_fly_map(uintptr_t virtual, size_t size, uint32_t attributes) {
+int pager_fly_map(void *cr3, uintptr_t virtual, size_t size, uint32_t attributes) {
 	attributes |= 1 << ARC_PAGER_4K;
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes };
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .cr3 = cr3 == NULL ? pml4 : cr3 };
 
 	if (pager_traverse(&info, pager_fly_map_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to fly map 0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", virtual, size, attributes);
@@ -306,13 +318,16 @@ static int pager_fly_unmap_callback(struct pager_traverse_info *info, uint64_t *
 
 	pmm_free((void *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK));
 	table[index] = 0;
-	__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
 
 	return 0;
 }
 
-int pager_fly_unmap(uintptr_t virtual, size_t size) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size};
+int pager_fly_unmap(void *cr3, uintptr_t virtual, size_t size) {
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .cr3 = cr3 == NULL ? pml4 : cr3 };
 
 	if (pager_traverse(&info, pager_fly_unmap_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map V0x%"PRIx64" (0x%"PRIx64" B)\n", virtual, size);
@@ -329,13 +344,16 @@ static int pager_set_attr_callback(struct pager_traverse_info *info, uint64_t *t
 
 	uint64_t address = table[index] & ADDRESS_MASK;
 	table[index] = address | get_entry_bits(level, info->attributes);
-	__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
 
 	return 0;
 }
 
-int pager_set_attr(uintptr_t virtual, size_t size, uint32_t attributes) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes};
+int pager_set_attr(void *cr3, uintptr_t virtual, size_t size, uint32_t attributes) {
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .cr3 = cr3 == NULL ? pml4 : cr3 };
 
 	if (pager_traverse(&info, pager_set_attr_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to set attr V0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", virtual, size, attributes);

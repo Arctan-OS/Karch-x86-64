@@ -65,6 +65,7 @@ static int syscall_3(struct ARC_SyscallArgs *args) {
 
 static int syscall_4(struct ARC_SyscallArgs *args) {
 	(void)args;
+	ARC_DEBUG(INFO, "Exiting\n");
 	// EXIT
 	return 0;
 }

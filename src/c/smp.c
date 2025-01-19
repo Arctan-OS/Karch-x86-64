@@ -295,8 +295,8 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 	// NOTE: This is a virtual address
 	void *stack_high = alloc(PAGE_SIZE * 2);
 
-	pager_map(ARC_HHDM_TO_PHYS(code), ARC_HHDM_TO_PHYS(code), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
-	pager_map(ARC_HHDM_TO_PHYS(stack), ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
+	pager_map(NULL, ARC_HHDM_TO_PHYS(code), ARC_HHDM_TO_PHYS(code), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
+	pager_map(NULL, ARC_HHDM_TO_PHYS(stack), ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
 
 	memset(code, 0, PAGE_SIZE);
 	memcpy(code, (void *)&__AP_START_BEGIN__, (size_t)((uintptr_t)&__AP_START_END__ - (uintptr_t)&__AP_START_BEGIN__));
@@ -342,8 +342,8 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 
 	while ((info->flags & 1) == 0) __asm__("pause");
 
-	pager_unmap(ARC_HHDM_TO_PHYS(code), PAGE_SIZE);
-	pager_unmap(ARC_HHDM_TO_PHYS(stack), PAGE_SIZE);
+	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE);
+	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE);
 
 	pmm_low_free(code);
 	pmm_low_free(stack);

@@ -47,7 +47,7 @@
  * @param uint32_t attributes - Attributes for page entries (see above ARC_PAGER_* definitions for bit offsets)
  * @return zero on success.
  * */
-int pager_map(uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attributes) ;
+int pager_map(void *cr3, uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attributes) ;
 
 /**
  * Unmap the given virtual range.
@@ -59,20 +59,20 @@ int pager_map(uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attri
  * @param size_t size - The length of the virtual range in bytes.
  * @return zero on success.
  * */
-int pager_unmap(uintptr_t virtual, size_t size);
+int pager_unmap(void *cr3, uintptr_t virtual, size_t size);
 
 /**
  *
  *
  * @return zero on success.
  * */
-int pager_fly_map(uintptr_t virtual, size_t size, uint32_t attributes);
+int pager_fly_map(void *cr3, uintptr_t virtual, size_t size, uint32_t attributes);
 
 /**
  *
  * @ return zero on success.
  * */
-int pager_fly_unmap(uintptr_t virtual, size_t size);
+int pager_fly_unmap(void *cr3, uintptr_t virtual, size_t size);
 
 /**
  * Set paging attributes in the given range.
@@ -86,8 +86,7 @@ int pager_fly_unmap(uintptr_t virtual, size_t size);
  * @param uint32_t attributes - The attributes to set.
  * @return zero on success.
  * */
-int pager_set_attr(uintptr_t virtual, size_t size, uint32_t attributes);
-
+int pager_set_attr(void *cr3, uintptr_t virtual, size_t size, uint32_t attributes);
 /**
  * Initialize the x86-64 pager.
  * */

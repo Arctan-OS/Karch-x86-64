@@ -208,7 +208,7 @@ int init_lapic() {
         lapic_msr |= (1 << 11);
         _x86_WRMSR(0x1B, lapic_msr);
 
-	if (pager_map((uint64_t)reg, (uint64_t)reg, PAGE_SIZE, 1 << ARC_PAGER_RW | ARC_PAGER_PAT_UC) != 0) {
+	if (pager_map(NULL, (uint64_t)reg, (uint64_t)reg, PAGE_SIZE, 1 << ARC_PAGER_RW | ARC_PAGER_PAT_UC) != 0) {
 		ARC_DEBUG(ERR, "Failed to map LAPIC register\n");
 	}
 

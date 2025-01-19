@@ -26,6 +26,7 @@
 */
 #ifndef ARC_IO_PORT_H
 #define ARC_IO_PORT_H
+#ifdef ARC_TARGET_ARCH_X86_64
 
 #include <stdint.h>
 
@@ -41,4 +42,5 @@ uint32_t ind(uint16_t port);
 void outq(uint16_t port, uint64_t value);
 uint64_t inq(uint16_t port);
 
+#endif
 #endif
