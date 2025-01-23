@@ -87,6 +87,9 @@ int pager_fly_unmap(void *cr3, uintptr_t virtual, size_t size);
  * @return zero on success.
  * */
 int pager_set_attr(void *cr3, uintptr_t virtual, size_t size, uint32_t attributes);
+
+int pager_clone(void *cr3, uintptr_t virt_src, uintptr_t virt_dest, size_t size);
+
 /**
  * Initialize the x86-64 pager.
  * */

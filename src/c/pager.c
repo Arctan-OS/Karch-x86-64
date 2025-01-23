@@ -47,6 +47,10 @@ struct pager_traverse_info {
 	uintptr_t physical;
 	size_t size;
 	uint32_t attributes;
+	uint32_t pml4e;
+	uint32_t pml3e;
+	uint32_t pml2e;
+	uint32_t pml1e;
 };
 
 // Value current loaded in CR3
@@ -121,7 +125,6 @@ uint64_t get_entry_bits(int level, uint32_t attributes) {
 static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32_t attributes) {
 	int shift = ((level - 1) * 9) + 12;
 	int index = (virtual >> shift) & 0x1FF;
-
 	uint64_t entry = parent[index];
 
 	uint64_t *address = (uint64_t *)ARC_PHYS_TO_HHDM(entry & 0x0000FFFFFFFFF000);
@@ -176,9 +179,11 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	while (info->virtual < target) {
 		uint64_t *table = info->cr3;
 		int index = get_page_table(table, 4, info->virtual, info->attributes);
+		info->pml4e = index;
 
 		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 3, info->virtual, info->attributes);
+		info->pml3e = index;
 		bool create_large = ((info->attributes >> ARC_PAGER_RESV0) & 1) & ~((info->attributes >> ARC_PAGER_4K) & 1);
 
 		if (info->size > ONE_GIB && create_large) {
@@ -196,6 +201,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 
 		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 2, info->virtual, info->attributes);
+		info->pml2e = index;
 		create_large = ((info->attributes >> ARC_PAGER_RESV1) & 1) & ~((info->attributes >> ARC_PAGER_4K) & 1);
 
 		if (info->size > TWO_MIB && create_large) {
@@ -213,6 +219,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 
 		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 1, info->virtual, info->attributes);
+		info->pml1e = index;
 
 		// Map 4K page
 		if (callback(info, table, index, 1) != 0) {
@@ -357,6 +364,75 @@ int pager_set_attr(void *cr3, uintptr_t virtual, size_t size, uint32_t attribute
 
 	if (pager_traverse(&info, pager_set_attr_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to set attr V0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", virtual, size, attributes);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {
+	if (info == NULL || table == NULL || level == 0) {
+		return -1;
+	}
+
+	uint64_t *pml3 = NULL;
+	if ((pml3 = (uint64_t *)(pml4[info->pml4e] & ADDRESS_MASK)) == NULL) {
+		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
+		return -2;
+	}
+
+	pml3 = (uint64_t *)ARC_PHYS_TO_HHDM(pml3);
+
+	uint64_t *pml2 = NULL;
+	if ((pml2 = (uint64_t *)(pml3[info->pml3e] & ADDRESS_MASK)) == NULL) {
+		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
+		return -3;
+	}
+
+	if (((pml3[info->pml3e] >> 7) & 1) == 1) {
+		// 1 GiB page
+		table[index] = pml3[info->pml3e];
+		goto basic_quit;
+	}
+
+	pml2 = (uint64_t *)ARC_PHYS_TO_HHDM(pml2);
+
+	uint64_t *pml1 = NULL;
+	if ((pml1 = (uint64_t *)(pml2[info->pml2e] & ADDRESS_MASK)) == NULL) {
+		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
+		return -4;
+	}
+
+	if (((pml2[info->pml2e] >> 7) & 1) == 1) {
+		// 2 MiB page
+		table[index] = pml2[info->pml2e];
+		goto basic_quit;
+	}
+
+	pml1 = (uint64_t *)ARC_PHYS_TO_HHDM(pml1);
+
+	if ((pml1[info->pml1e] & ADDRESS_MASK) == 0) {
+		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
+		return -5;
+	}
+	// 4 KiB page
+	table[index] = pml1[info->pml1e];
+
+	basic_quit:;
+
+	if (info->cr3 == pml4) {
+		__asm__("invlpg [%0]" : : "r"(info->virtual) : );
+	}
+
+	return 0;
+}
+
+int pager_clone(void *cr3, uintptr_t virt_src, uintptr_t virt_dest, size_t size) {
+	// Always clones from current CR3
+	struct pager_traverse_info info = { .physical = virt_src, .virtual = virt_dest, .size = size, .cr3 = cr3 == NULL ? pml4 : cr3 };
+
+	if (pager_traverse(&info, pager_clone_callback) != 0) {
+		ARC_DEBUG(ERR, "Failed to clone V0x%"PRIx64" to V0x%"PRIx64" for %lu bytes\n", virt_src, virt_dest, size);
 		return -1;
 	}
 
