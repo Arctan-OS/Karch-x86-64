@@ -31,6 +31,8 @@
 #include <stddef.h>
 #include <arch/pager.h>
 
+extern uint64_t *pml4;
+
 /**
  * Map the given physical to the given virtual.
  *

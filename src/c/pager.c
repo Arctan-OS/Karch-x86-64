@@ -54,7 +54,7 @@ struct pager_traverse_info {
 };
 
 // Value current loaded in CR3
-static uint64_t *pml4 = NULL;
+uint64_t *pml4 = NULL;
 
 uint64_t get_entry_bits(int level, uint32_t attributes) {
 	// Level 0: Page

@@ -471,7 +471,6 @@ GENERIC_HANDLER(32) {
 		GENERIC_HANDLER_POSTAMBLE(32);
 		return 0;
 	}
-
 	struct ARC_ProcessorDescriptor *processor = &Arc_ProcessorList[processor_id];
 
 	if ((processor->generic.flags & 1) == 1) {
@@ -572,7 +571,6 @@ GENERIC_HANDLER(32) {
 	}
 
 	mutex_unlock(&processor->generic.timer_lock);
-
 
 	GENERIC_HANDLER_POSTAMBLE(32);
 	return 0;

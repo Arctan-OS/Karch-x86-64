@@ -162,9 +162,10 @@ int init_syscall() {
 	_x86_WRMSR(0xC0000082, ia32_lstar);
 
 	uint64_t ia32_star = _x86_RDMSR(0xC0000081);
-	uint16_t syscall_ss_cs = 0x08;
-	uint16_t sysret_ss_cs = 0x10;
-	ia32_star |= (uint64_t)((sysret_ss_cs << 16) | syscall_ss_cs) << 32;
+	uint64_t syscall_ss_cs = 0x08;
+	uint32_t syscall_eip = 0x0;
+	uint64_t sysret_ss_cs = 0x10; // CS: This value + 0x10, SS: This value + 0x8
+	ia32_star |= sysret_ss_cs << 48 | syscall_ss_cs << 32 | syscall_eip;
 	_x86_WRMSR(0xC0000081, ia32_star);
 
 	uint64_t ia32_efer = _x86_RDMSR(0xC0000080);
