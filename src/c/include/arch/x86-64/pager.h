@@ -31,7 +31,7 @@
 #include <stddef.h>
 #include <arch/pager.h>
 
-extern uint64_t *pml4;
+extern uintptr_t Arc_KernelPageTables;
 
 /**
  * Map the given physical to the given virtual.

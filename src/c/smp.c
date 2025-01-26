@@ -37,8 +37,8 @@
 #include <mm/allocator.h>
 #include <arch/x86-64/gdt.h>
 #include <arch/x86-64/idt.h>
-#include <arch/x86-64/sse.h>
 #include <arch/smp.h>
+#include <arch/start.h>
 
 extern uint8_t __AP_START_BEGIN__;
 extern uint8_t __AP_START_END__;
@@ -85,7 +85,7 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 		ARC_HANG;
 	}
 
-	init_gdt();
+	Arc_ProcessorList[id].generic.pl0_stack = (void *)init_gdt();
 	_install_idt();
 
 	init_lapic();
@@ -97,6 +97,7 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 
 	Arc_ProcessorList[id].generic.status |= 1;
 
+//        __asm__("mov ecx, 0xC0000102; wrmsr" : : "a"(&Arc_ProcessorList[id]) : "rcx");
 	__asm__("sti");
 
 	info->flags |= 1;
@@ -249,6 +250,10 @@ int smp_far_jmp(struct ARC_ProcessorDescriptor *processor, uint32_t cs, void *fu
 	return 0;
 }
 
+int smp_switch_kpages() {
+	return 0;
+}
+
 int smp_list_aps() {
 	printf("-- %d Processors --\n", Arc_ProcessorCounter);
 	struct ARC_ProcessorDescriptor *current = Arc_BootProcessor;
@@ -275,8 +280,10 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 		// BSP
 		Arc_BootProcessor = &Arc_ProcessorList[lapic];
 		Arc_BootProcessor->generic.status |= 1;
-
+		Arc_BootProcessor->generic.pl0_stack = (void *)Arc_MainPL0Stack;
 		Arc_ProcessorCounter++;
+		printf("%p\n", Arc_BootProcessor);
+		__asm__("mov ecx, 0xC0000102; wrmsr" : : "a"((uintptr_t)Arc_BootProcessor) : "rcx");
 
 		return 0;
 	}

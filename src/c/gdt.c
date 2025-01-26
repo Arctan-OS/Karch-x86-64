@@ -117,7 +117,7 @@ void set_tss_gate(struct gdt_entry_container *gdt_entries, uint64_t base, uint32
 
 extern void _install_gdt();
 extern void _install_tss(uint32_t index);
-void init_gdt() {
+uintptr_t init_gdt() {
 	ARC_DEBUG(INFO, "Initializing GDT\n");
 
 	struct gdt_entry_container *container = (struct gdt_entry_container *)alloc(sizeof(*container));
@@ -171,4 +171,5 @@ void init_gdt() {
 	ARC_DEBUG(INFO, "Installed TSS\n");
 	ARC_DEBUG(INFO, "Initialized GDT\n");
 
+	return rsp;
 }

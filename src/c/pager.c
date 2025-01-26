@@ -53,8 +53,8 @@ struct pager_traverse_info {
 	uint32_t pml1e;
 };
 
-// Value current loaded in CR3
-uint64_t *pml4 = NULL;
+uintptr_t Arc_KernelPageTables = 0;
+static uint64_t *pml4 = NULL;
 
 uint64_t get_entry_bits(int level, uint32_t attributes) {
 	// Level 0: Page
@@ -377,19 +377,21 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	uint64_t *pml3 = NULL;
 	if ((pml3 = (uint64_t *)(pml4[info->pml4e] & ADDRESS_MASK)) == NULL) {
-		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
-		return -2;
+		return 0;
 	}
 
 	pml3 = (uint64_t *)ARC_PHYS_TO_HHDM(pml3);
 
 	uint64_t *pml2 = NULL;
 	if ((pml2 = (uint64_t *)(pml3[info->pml3e] & ADDRESS_MASK)) == NULL) {
-		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
-		return -3;
+		return 0;
 	}
 
 	if (((pml3[info->pml3e] >> 7) & 1) == 1) {
+		if (table[index] != 0) {
+			ARC_DEBUG(ERR, "Cannot overwrite\n");
+			return -2;
+		}
 		// 1 GiB page
 		table[index] = pml3[info->pml3e];
 		goto basic_quit;
@@ -399,11 +401,14 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	uint64_t *pml1 = NULL;
 	if ((pml1 = (uint64_t *)(pml2[info->pml2e] & ADDRESS_MASK)) == NULL) {
-		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
-		return -4;
+		return 0;
 	}
 
 	if (((pml2[info->pml2e] >> 7) & 1) == 1) {
+		if (table[index] != 0) {
+			ARC_DEBUG(ERR, "Cannot overwrite\n");
+			return -2;
+		}
 		// 2 MiB page
 		table[index] = pml2[info->pml2e];
 		goto basic_quit;
@@ -412,9 +417,14 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	pml1 = (uint64_t *)ARC_PHYS_TO_HHDM(pml1);
 
 	if ((pml1[info->pml1e] & ADDRESS_MASK) == 0) {
-		ARC_DEBUG(ERR, "0x%"PRIx64" is not mapped, quitting clone\n", info->virtual);
-		return -5;
+		return 0;
 	}
+
+	if (table[index] != 0) {
+		ARC_DEBUG(ERR, "Cannot overwrite\n");
+		return -2;
+	}
+
 	// 4 KiB page
 	table[index] = pml1[info->pml1e];
 
@@ -439,11 +449,17 @@ int pager_clone(void *cr3, uintptr_t virt_src, uintptr_t virt_dest, size_t size)
 	return 0;
 }
 
+int pager_switch_to_kpages() {
+	return 0;
+}
+
+
 int init_pager() {
 	ARC_DEBUG(INFO, "Initializing pager\n");
 
 	_x86_getCR3();
 	pml4 = (uint64_t *)ARC_PHYS_TO_HHDM(_x86_CR3);
+	Arc_KernelPageTables = ARC_HHDM_TO_PHYS(pml4);
 
 	ARC_DEBUG(INFO, "Initialized pager (%p)\n", pml4);
 

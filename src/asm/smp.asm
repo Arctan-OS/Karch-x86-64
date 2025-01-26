@@ -116,6 +116,7 @@ pm:
         push eax
         retf
 
+extern Arc_ProcessorList
 bits 64
 lm:
         mov ax, 0x10
@@ -156,11 +157,14 @@ lm:
         mov rbp, qword [rcx + AP_STACK_HIGH_OFF]
         mov rsp, rbp
 
-        mov rax, qword [rcx + AP_ENTRY_OFF]
+        mov rbx, qword [rcx + AP_ENTRY_OFF]
         mov rdi, rcx
         add rdi, AP_PML4_OFF
 
-        call rax
+
+
+        call rbx
+
         jmp $
 
 global __AP_START_INFO__

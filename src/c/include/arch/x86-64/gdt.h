@@ -29,6 +29,8 @@
 #ifndef ARC_ARCH_X86_64_GDT_H
 #define ARC_ARCH_X86_64_GDT_H
 
+#include <stdint.h>
+
 /**
  * Initialize the GDT
  *
@@ -37,6 +39,6 @@
  * kernel code, kernel data, user code, user data.
  * */
 
-void init_gdt();
+uintptr_t init_gdt();
 
 #endif

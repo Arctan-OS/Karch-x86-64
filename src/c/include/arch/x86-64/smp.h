@@ -39,7 +39,7 @@ struct ARC_ProcessorDescriptor {
 	uint32_t bist;
 	uint32_t model_info;
 	struct ARC_GenericProcessorDescriptor generic;
-};
+}__attribute__((packed));
 
 /**
  * Hold the given processor.
