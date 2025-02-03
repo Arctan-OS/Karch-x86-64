@@ -27,7 +27,7 @@
 #include <arch/x86-64/apic/ioapic.h>
 #include <global.h>
 #include <mm/allocator.h>
-#include <arch/x86-64/pager.h>
+#include <arch/pager.h>
 #include <mm/vmm.h>
 #include <stdint.h>
 

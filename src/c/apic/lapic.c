@@ -28,7 +28,7 @@
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
 #include <cpuid.h>
-#include <arch/x86-64/pager.h>
+#include <arch/pager.h>
 #include <mm/allocator.h>
 
 struct lapic_reg {

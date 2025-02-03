@@ -1,4 +1,4 @@
-#include <arch/x86-64/io/port.h>
+#include <arch/io/port.h>
 
 void outw(uint16_t port, uint16_t value) {
 	outb(port++, ((value >> 0) & 0xFF));

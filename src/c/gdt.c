@@ -92,6 +92,10 @@ struct gdt_entry_container {
 	struct tss_entry tss;
 }__attribute__((packed));
 
+// TODO: Is this really the best way?
+static uint8_t ists[ARC_MAX_PROCESSORS][PAGE_SIZE] = { 0 };
+static struct gdt_entry_container gdts[ARC_MAX_PROCESSORS] = { 0 };
+
 void set_gdt_gate(struct gdt_entry_container *gdt_entries, int i, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags) {
 	gdt_entries->gdt[i].base1 = (base      ) & 0xFFFF;
 	gdt_entries->gdt[i].base2 = (base >> 16) & 0xFF;
@@ -117,19 +121,10 @@ void set_tss_gate(struct gdt_entry_container *gdt_entries, uint64_t base, uint32
 
 extern void _install_gdt();
 extern void _install_tss(uint32_t index);
-uintptr_t init_gdt() {
+uintptr_t init_gdt(int processor) {
 	ARC_DEBUG(INFO, "Initializing GDT\n");
 
-	struct gdt_entry_container *container = (struct gdt_entry_container *)alloc(sizeof(*container));
-
-	if (container == NULL) {
-		ARC_DEBUG(ERR, "Failed to allocate GDT container");
-		memset(Arc_MainTerm.framebuffer, 0, Arc_MainTerm.fb_height * Arc_MainTerm.fb_width * (Arc_MainTerm.fb_bpp / 8));
-		term_draw(&Arc_MainTerm);
-		ARC_HANG;
-	}
-
-	memset(container, 0, sizeof(*container));
+	struct gdt_entry_container *container = &gdts[processor];
 
 	set_gdt_gate(container, 0, 0, 0, 0, 0);
 	set_gdt_gate(container, 1, 0, 0xFFFFFFFF, 0x9A, 0xA); // Kernel Code 64
@@ -152,7 +147,8 @@ uintptr_t init_gdt() {
 
 	set_tss_gate(container, (uint64_t)tss, sizeof(*tss) - 1, 0x89, 0x0);
 
-	uintptr_t ist = (uintptr_t)alloc(PAGE_SIZE * 2) + (PAGE_SIZE * 2) - 0x8;
+	uintptr_t ist = (uintptr_t)&ists[processor] + PAGE_SIZE - 8;
+	printf("Processor %d IST: %"PRIx64"\n", processor, ist);
 	uintptr_t rsp = (uintptr_t)alloc(PAGE_SIZE * 2) + (PAGE_SIZE * 2) - 0x8;
 	tss->ist1_low = (ist & UINT32_MAX);
 	tss->ist1_high = (ist >> 32) & UINT32_MAX;

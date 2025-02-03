@@ -45,9 +45,13 @@ bits 64
         push rcx
         push rbx
         push rax
+        mov rax, cr3
+        push rax
 %endmacro
 
 %macro POP_ALL 0
+        pop rax
+        mov cr3, rax
         pop rax
         pop rbx
         pop rcx

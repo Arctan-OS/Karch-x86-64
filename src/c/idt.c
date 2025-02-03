@@ -33,6 +33,8 @@
 #include <arch/x86-64/apic/lapic.h>
 #include <arch/x86-64/context.h>
 #include <arch/smp.h>
+#include <mp/sched/abstract.h>
+#include <arch/pager.h>
 
 #define GENERIC_HANDLER(__vector)					\
 	extern void _idt_stub_##__vector();				\
@@ -99,6 +101,8 @@
 
 #define GENERIC_HANDLER_INSTALL(__vector)	\
 	install_idt_gate(__vector, (uintptr_t)&_idt_stub_##__vector, 0x08, 0x8E);
+
+
 
 static const char *exception_names[] = {
 	"Division Error (#DE)",
@@ -291,8 +295,6 @@ GENERIC_HANDLER(13) {
 		printf("\tIDT vector number\n");
 	}
 
-	printf("Error code 0x%"PRIx64"\n", interrupt_error_code);
-
 	spinlock_unlock(&panic_lock);
 	ARC_HANG;
 	return 0;
@@ -471,108 +473,141 @@ GENERIC_HANDLER(32) {
 		GENERIC_HANDLER_POSTAMBLE(32);
 		return 0;
 	}
-	struct ARC_ProcessorDescriptor *processor = &Arc_ProcessorList[processor_id];
 
-	if ((processor->generic.flags & 1) == 1) {
-		// Context switch
-		struct ARC_Registers current = { 0 };
+	struct ARC_ProcessorDescriptor *processor = smp_get_proc_desc();
 
-		// Save current state
-		current.rax = regs->rax;
-		current.rbx = regs->rbx;
-		current.rcx = regs->rcx;
-		current.rdx = regs->rdx;
-		current.rsi = regs->rsi;
-		current.rdi = regs->rdi;
-		current.rsp = interrupt_frame->rsp;
-		current.rbp = regs->rbp;
-		current.rip = regs->rip;
-		current.r8 = regs->r8;
-		current.r9 = regs->r9;
-		current.r10 = regs->r10;
-		current.r11 = regs->r11;
-		current.r12 = regs->r12;
-		current.r13 = regs->r13;
-		current.r14 = regs->r14;
-		current.r15 = regs->r15;
-		current.cs = interrupt_frame->cs;
-		current.rip = interrupt_frame->rip;
-		current.rflags = interrupt_frame->rflags;
-		current.ss = interrupt_frame->ss;
+	struct ARC_Registers *proc_regs = &processor->registers;
 
-		// Accept changes
-		regs->rax = processor->generic.registers.rax;
-		regs->rbx = processor->generic.registers.rbx;
-		regs->rcx = processor->generic.registers.rcx;
-		regs->rdx = processor->generic.registers.rdx;
-		regs->rsi = processor->generic.registers.rsi;
-		regs->rdi = processor->generic.registers.rdi;
-		interrupt_frame->rsp = processor->generic.registers.rsp;
-		regs->rbp = processor->generic.registers.rbp;
-		regs->rip = processor->generic.registers.rip;
-		regs->r8 = processor->generic.registers.r8;
-		regs->r9 = processor->generic.registers.r9;
-		regs->r10 = processor->generic.registers.r10;
-		regs->r11 = processor->generic.registers.r11;
-		regs->r12 = processor->generic.registers.r12;
-		regs->r13 = processor->generic.registers.r13;
-		regs->r14 = processor->generic.registers.r14;
-		regs->r15 = processor->generic.registers.r15;
-		interrupt_frame->cs = processor->generic.registers.cs;
-		interrupt_frame->rip = processor->generic.registers.rip;
-		interrupt_frame->rflags = processor->generic.registers.rflags;
-		interrupt_frame->ss = processor->generic.registers.ss;
+	uintptr_t cr3_change = pager_switch_to_kpages();
 
-		// Write back current state
-		smp_context_write(processor, &current);
-		processor->generic.flags &= ~1;
+	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXSAVE, 1) == 1) {
+		proc_regs->rax = regs->rax;
+		proc_regs->rbx = regs->rbx;
+		proc_regs->rcx = regs->rcx;
+		proc_regs->rdx = regs->rdx;
+		proc_regs->rsi = regs->rsi;
+		proc_regs->rdi = regs->rdi;
+		proc_regs->rsp = interrupt_frame->rsp;
+		proc_regs->rbp = regs->rbp;
+		proc_regs->rip = regs->rip;
+		proc_regs->r8 = regs->r8;
+		proc_regs->r9 = regs->r9;
+		proc_regs->r10 = regs->r10;
+		proc_regs->r11 = regs->r11;
+		proc_regs->r12 = regs->r12;
+		proc_regs->r13 = regs->r13;
+		proc_regs->r14 = regs->r14;
+		proc_regs->r15 = regs->r15;
+		proc_regs->cs = interrupt_frame->cs;
+		proc_regs->rip = interrupt_frame->rip;
+		proc_regs->rflags = interrupt_frame->rflags;
+		proc_regs->ss = interrupt_frame->ss;
+
+		processor->flags &= ~(1 << 1);
 	}
 
-	if (((processor->generic.flags >> 1) & 1) == 1) {
-		// Write back current state
-		processor->generic.registers.rax = regs->rax;
-		processor->generic.registers.rbx = regs->rbx;
-		processor->generic.registers.rcx = regs->rcx;
-		processor->generic.registers.rdx = regs->rdx;
-		processor->generic.registers.rsi = regs->rsi;
-		processor->generic.registers.rdi = regs->rdi;
-		processor->generic.registers.rsp = interrupt_frame->rsp;
-		processor->generic.registers.rbp = regs->rbp;
-		processor->generic.registers.rip = regs->rip;
-		processor->generic.registers.r8 = regs->r8;
-		processor->generic.registers.r9 = regs->r9;
-		processor->generic.registers.r10 = regs->r10;
-		processor->generic.registers.r11 = regs->r11;
-		processor->generic.registers.r12 = regs->r12;
-		processor->generic.registers.r13 = regs->r13;
-		processor->generic.registers.r14 = regs->r14;
-		processor->generic.registers.r15 = regs->r15;
-		processor->generic.registers.cs = interrupt_frame->cs;
-		processor->generic.registers.rip = interrupt_frame->rip;
-		processor->generic.registers.rflags = interrupt_frame->rflags;
-		processor->generic.registers.ss = interrupt_frame->ss;
+	struct ARC_Registers *source = proc_regs;
 
-		processor->generic.flags &= ~(1 << 1);
+	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXWRITE, 1) == 1) {
+	        ctx_switch:;
+		struct ARC_Registers saved = { 0 };
+
+		saved.rax = regs->rax;
+		saved.rbx = regs->rbx;
+		saved.rcx = regs->rcx;
+		saved.rdx = regs->rdx;
+		saved.rsi = regs->rsi;
+		saved.rdi = regs->rdi;
+		saved.rsp = interrupt_frame->rsp;
+		saved.rbp = regs->rbp;
+		saved.rip = regs->rip;
+		saved.r8 = regs->r8;
+		saved.r9 = regs->r9;
+		saved.r10 = regs->r10;
+		saved.r11 = regs->r11;
+		saved.r12 = regs->r12;
+		saved.r13 = regs->r13;
+		saved.r14 = regs->r14;
+		saved.r15 = regs->r15;
+		saved.cs = interrupt_frame->cs;
+		saved.rip = interrupt_frame->rip;
+		saved.rflags = interrupt_frame->rflags;
+		saved.ss = interrupt_frame->ss;
+
+		// Switch to desired context
+		regs->rax = source->rax;
+		regs->rbx = source->rbx;
+		regs->rcx = source->rcx;
+		regs->rdx = source->rdx;
+		regs->rsi = source->rsi;
+		regs->rdi = source->rdi;
+		interrupt_frame->rsp = source->rsp;
+		regs->rbp = source->rbp;
+		regs->rip = source->rip;
+		regs->r8 = source->r8;
+		regs->r9 = source->r9;
+		regs->r10 = source->r10;
+		regs->r11 = source->r11;
+		regs->r12 = source->r12;
+		regs->r13 = source->r13;
+		regs->r14 = source->r14;
+		regs->r15 = source->r15;
+		interrupt_frame->cs = source->cs;
+		interrupt_frame->rip = source->rip;
+		interrupt_frame->rflags = source->rflags;
+		interrupt_frame->ss = source->ss;
+
+		smp_context_write(processor, &saved);
+		processor->flags &= ~1;
+	} else if (processor->next_thread != NULL) {
+		// Switch to next thread
+		thread_switch:;
+		if (processor->last_thread != NULL) {
+			smp_context_save(processor, &processor->last_thread->ctx);
+		}
+		printf("switch by: %d\n", processor_id);
+
+		processor->last_thread = processor->current_thread;
+		processor->current_thread = processor->next_thread;
+		processor->next_thread = NULL;
+
+		source = &processor->current_thread->ctx;
+		goto ctx_switch;
+	} else {
+		// Determine next thread
+		// Jump back up
+		sched_tick();
+		struct ARC_Process *proc = sched_get_current_proc();
+
+		if (proc != NULL && proc->nextex != NULL) {
+			cr3_change = ARC_HHDM_TO_PHYS(proc->page_tables);
+			printf("%p\n", cr3_change);
+			processor->next_thread = proc->nextex;
+			proc->nextex = proc->nextex->next;
+			goto thread_switch;
+		}
 	}
 
-	mutex_unlock(&processor->generic.register_lock);
+	mutex_unlock(&processor->register_lock);
 
-	mutex_lock(&processor->generic.timer_lock);
+	mutex_lock(&processor->timer_lock);
 
-	if (processor->generic.timer_mode == ARC_LAPIC_TIMER_ONESHOT) {
-		lapic_refresh_timer(processor->generic.timer_ticks);
+	if (processor->timer_mode == ARC_LAPIC_TIMER_ONESHOT) {
+		lapic_refresh_timer(processor->timer_ticks);
+	}
+	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_WTIMER, 1) == 1) {
+		lapic_setup_timer(32, processor->timer_mode);
+		lapic_refresh_timer(processor->timer_ticks);
+
+		processor->flags &= ~(1 << 2);
 	}
 
-	if (((processor->generic.flags >> 2) & 1) == 1) {
-		lapic_setup_timer(32, processor->generic.timer_mode);
-		lapic_refresh_timer(processor->generic.timer_ticks);
+	mutex_unlock(&processor->timer_lock);
 
-		processor->generic.flags &= ~(1 << 2);
-	}
-
-	mutex_unlock(&processor->generic.timer_lock);
+	regs->cr3 = cr3_change;
 
 	GENERIC_HANDLER_POSTAMBLE(32);
+
 	return 0;
 }
 

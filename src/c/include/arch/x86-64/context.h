@@ -30,6 +30,7 @@
 #include <stdint.h>
 
 struct ARC_Registers {
+	uint64_t cr3;
 	uint64_t rax;
 	uint64_t rbx;
 	uint64_t rcx;

@@ -161,8 +161,6 @@ lm:
         mov rdi, rcx
         add rdi, AP_PML4_OFF
 
-
-
         call rbx
 
         jmp $

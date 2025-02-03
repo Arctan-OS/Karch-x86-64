@@ -26,11 +26,10 @@
  * This file implements functions for initializing and managing application processors
  * for symmetric multi-processing.
 */
-#include <arch/x86-64/smp.h>
 #include <arch/x86-64/apic/lapic.h>
 #include <interface/printf.h>
 #include <global.h>
-#include <arch/x86-64/pager.h>
+#include <arch/pager.h>
 #include <mm/pmm.h>
 #include <lib/util.h>
 #include <arch/x86-64/ctrl_regs.h>
@@ -39,10 +38,7 @@
 #include <arch/x86-64/idt.h>
 #include <arch/smp.h>
 #include <arch/start.h>
-
-extern uint8_t __AP_START_BEGIN__;
-extern uint8_t __AP_START_END__;
-extern uint8_t __AP_START_INFO__;
+#include <arch/x86-64/syscall.h>
 
 struct ap_start_info {
 	uint64_t pml4;
@@ -66,7 +62,17 @@ struct ap_start_info {
 	uint64_t stack_high;
 }__attribute__((packed));
 
+extern uint8_t __AP_START_BEGIN__;
+extern uint8_t __AP_START_END__;
+extern uint8_t __AP_START_INFO__;
+
+struct ARC_ProcessorDescriptor Arc_ProcessorList[ARC_MAX_PROCESSORS] = { 0 };
+uint32_t Arc_ProcessorCounter = 0;
+struct ARC_ProcessorDescriptor *Arc_BootProcessor = NULL;
+
 static uint32_t last_lapic = 0;
+static uint8_t *userspace_hold = NULL;
+static ARC_GenericSpinlock userspace_lock = 0;
 
 /**
  * Further initialize the application processor to synchronize with the BSP.
@@ -85,19 +91,22 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 		ARC_HANG;
 	}
 
-	Arc_ProcessorList[id].generic.pl0_stack = (void *)init_gdt();
+	Arc_ProcessorList[id].syscall_stack = init_gdt(id);
 	_install_idt();
 
 	init_lapic();
 	lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
-	Arc_ProcessorList[id].generic.timer_ticks = 1000;
-	Arc_ProcessorList[id].generic.timer_mode = ARC_LAPIC_TIMER_PERIODIC;
+	Arc_ProcessorList[id].timer_ticks = 1000;
+	Arc_ProcessorList[id].timer_mode = ARC_LAPIC_TIMER_PERIODIC;
 	lapic_refresh_timer(1000);
 	lapic_calibrate_timer();
 
-	Arc_ProcessorList[id].generic.status |= 1;
+	_x86_WRMSR(0xC0000102, (uintptr_t)&Arc_ProcessorList[id]);
 
-//        __asm__("mov ecx, 0xC0000102; wrmsr" : : "a"(&Arc_ProcessorList[id]) : "rcx");
+	init_syscall();
+
+	Arc_ProcessorList[id].flags |= 1 << ARC_SMP_FLAGS_INIT;
+
 	__asm__("sti");
 
 	info->flags |= 1;
@@ -108,8 +117,7 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 }
 
 int smp_hold(struct ARC_ProcessorDescriptor *processor) {
-	processor->generic.status |= 1 << 1;
-	ARC_DEBUG(INFO, "Holding processor %d\n", processor->generic.processor);
+	processor->flags |= 1 << ARC_SMP_FLAGS_HOLD;
 	ARC_HANG;
 }
 
@@ -118,28 +126,28 @@ int smp_context_write(struct ARC_ProcessorDescriptor *processor, struct ARC_Regi
 		return 1;
 	}
 
-	processor->generic.registers.rax = regs->rax;
-	processor->generic.registers.rbx = regs->rbx;
-	processor->generic.registers.rcx = regs->rcx;
-	processor->generic.registers.rdx = regs->rdx;
-	processor->generic.registers.rsi = regs->rsi;
-	processor->generic.registers.rdi = regs->rdi;
-	processor->generic.registers.rsp = regs->rsp;
-	processor->generic.registers.rbp = regs->rbp;
-	processor->generic.registers.r8 = regs->r8;
-	processor->generic.registers.r9 = regs->r9;
-	processor->generic.registers.r10 = regs->r10;
-	processor->generic.registers.r11 = regs->r11;
-	processor->generic.registers.r12 = regs->r12;
-	processor->generic.registers.r13 = regs->r13;
-	processor->generic.registers.r14 = regs->r14;
-	processor->generic.registers.r15 = regs->r15;
-	processor->generic.registers.cs = regs->cs;
-	processor->generic.registers.rip = regs->rip;
-	processor->generic.registers.rflags = regs->rflags;
-	processor->generic.registers.ss = regs->ss;
+	processor->registers.rax = regs->rax;
+	processor->registers.rbx = regs->rbx;
+	processor->registers.rcx = regs->rcx;
+	processor->registers.rdx = regs->rdx;
+	processor->registers.rsi = regs->rsi;
+	processor->registers.rdi = regs->rdi;
+	processor->registers.rsp = regs->rsp;
+	processor->registers.rbp = regs->rbp;
+	processor->registers.r8 = regs->r8;
+	processor->registers.r9 = regs->r9;
+	processor->registers.r10 = regs->r10;
+	processor->registers.r11 = regs->r11;
+	processor->registers.r12 = regs->r12;
+	processor->registers.r13 = regs->r13;
+	processor->registers.r14 = regs->r14;
+	processor->registers.r15 = regs->r15;
+	processor->registers.cs = regs->cs;
+	processor->registers.rip = regs->rip;
+	processor->registers.rflags = regs->rflags;
+	processor->registers.ss = regs->ss;
 
-	processor->generic.flags |= 1;
+	processor->flags |= 1 << ARC_SMP_FLAGS_CTXWRITE;
 
 	return 0;
 }
@@ -149,27 +157,27 @@ int smp_context_save(struct ARC_ProcessorDescriptor *processor, struct ARC_Regis
 		return 1;
 	}
 
-	regs->rax = processor->generic.registers.rax;
-	regs->rbx = processor->generic.registers.rbx;
-	regs->rcx = processor->generic.registers.rcx;
-	regs->rdx = processor->generic.registers.rdx;
-	regs->rsi = processor->generic.registers.rsi;
-	regs->rdi = processor->generic.registers.rdi;
-	regs->rsp = processor->generic.registers.rsp;
-	regs->rbp = processor->generic.registers.rbp;
-	regs->rip = processor->generic.registers.rip;
-	regs->r8 = processor->generic.registers.r8;
-	regs->r9 = processor->generic.registers.r9;
-	regs->r10 = processor->generic.registers.r10;
-	regs->r11 = processor->generic.registers.r11;
-	regs->r12 = processor->generic.registers.r12;
-	regs->r13 = processor->generic.registers.r13;
-	regs->r14 = processor->generic.registers.r14;
-	regs->r15 = processor->generic.registers.r15;
-	regs->cs = processor->generic.registers.cs;
-	regs->rip = processor->generic.registers.rip;
-	regs->rflags = processor->generic.registers.rflags;
-	regs->ss = processor->generic.registers.ss;
+	regs->rax = processor->registers.rax;
+	regs->rbx = processor->registers.rbx;
+	regs->rcx = processor->registers.rcx;
+	regs->rdx = processor->registers.rdx;
+	regs->rsi = processor->registers.rsi;
+	regs->rdi = processor->registers.rdi;
+	regs->rsp = processor->registers.rsp;
+	regs->rbp = processor->registers.rbp;
+	regs->rip = processor->registers.rip;
+	regs->r8 = processor->registers.r8;
+	regs->r9 = processor->registers.r9;
+	regs->r10 = processor->registers.r10;
+	regs->r11 = processor->registers.r11;
+	regs->r12 = processor->registers.r12;
+	regs->r13 = processor->registers.r13;
+	regs->r14 = processor->registers.r14;
+	regs->r15 = processor->registers.r15;
+	regs->cs = processor->registers.cs;
+	regs->rip = processor->registers.rip;
+	regs->rflags = processor->registers.rflags;
+	regs->ss = processor->registers.ss;
 
 	return 0;
 }
@@ -179,7 +187,7 @@ int smp_context_save(struct ARC_ProcessorDescriptor *processor, struct ARC_Regis
  *
  * Set registers and stack according to SYS-V calling convention.
  *
- * NOTE: It is expected for processor->generic.register_lock to be held.
+ * NOTE: It is expected for processor->register_lock to be held.
  * */
 int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, int argc) {
 	int i = 0;
@@ -188,12 +196,12 @@ int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, i
 		uint64_t value = va_arg(list, uint64_t);
 
 		switch (i) {
-			case 0: { processor->generic.registers.rdi = value; break; }
-			case 1: { processor->generic.registers.rsi = value; break; }
-			case 2: { processor->generic.registers.rdx = value; break; }
-			case 3: { processor->generic.registers.rcx = value; break; }
-			case 4: { processor->generic.registers.r8  = value; break; }
-			case 5: { processor->generic.registers.r9  = value; break; }
+			case 0: { processor->registers.rdi = value; break; }
+			case 1: { processor->registers.rsi = value; break; }
+			case 2: { processor->registers.rdx = value; break; }
+			case 3: { processor->registers.rcx = value; break; }
+			case 4: { processor->registers.r8  = value; break; }
+			case 5: { processor->registers.r9  = value; break; }
 		}
 	}
 
@@ -205,85 +213,93 @@ int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, i
 
 	for (i = delta - 1; i >= 0; i--) {
 		uint64_t value = va_arg(list, uint64_t);
-		*(uint64_t *)(processor->generic.registers.rsp - (i * 8)) = value;
+		*(uint64_t *)(processor->registers.rsp - (i * 8)) = value;
 	}
 
-	processor->generic.registers.rsp -= delta * 8;
+	processor->registers.rsp -= delta * 8;
 
 	return 0;
 }
 
 int smp_jmp(struct ARC_ProcessorDescriptor *processor, void *function, int argc, ...) {
-	mutex_lock(&processor->generic.register_lock);
+	mutex_lock(&processor->register_lock);
 
 	va_list args;
 	va_start(args, argc);
 	smp_sysv_set_args(processor, args, argc);
 	va_end(args);
 
-	processor->generic.registers.rip = (uintptr_t)function;
+	processor->registers.rip = (uintptr_t)function;
 
-	mutex_unlock(&processor->generic.register_lock);
+	mutex_unlock(&processor->register_lock);
 
-	processor->generic.status &= ~(1 << 1);
-	processor->generic.flags |= 1;
-
-	return 0;
-}
-
-int smp_far_jmp(struct ARC_ProcessorDescriptor *processor, uint32_t cs, void *function, int argc, ...) {
-	mutex_lock(&processor->generic.register_lock);
-
-	va_list args;
-	va_start(args, argc);
-	smp_sysv_set_args(processor, args, argc);
-	va_end(args);
-
-	processor->generic.registers.cs = cs;
-	processor->generic.registers.rip = (uintptr_t)function;
-
-	mutex_unlock(&processor->generic.register_lock);
-
-	processor->generic.status &= ~(1 << 1);
-	processor->generic.flags |= 1;
+	processor->flags &= ~(1 << ARC_SMP_FLAGS_HOLD);
+	processor->flags |= 1 << ARC_SMP_FLAGS_CTXWRITE;
 
 	return 0;
 }
 
-int smp_switch_kpages() {
-	return 0;
+struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
+	struct ARC_ProcessorDescriptor *result = NULL;
+
+	__asm__("swapgs");
+	result = (struct ARC_ProcessorDescriptor *)_x86_RDMSR(0xC0000101);
+	__asm__("swapgs");
+
+	return result;
 }
 
-int smp_list_aps() {
-	printf("-- %d Processors --\n", Arc_ProcessorCounter);
-	struct ARC_ProcessorDescriptor *current = Arc_BootProcessor;
+uint32_t smp_get_processor_id() {
+	return lapic_get_id();
+}
 
-	while (current != NULL) {
-		printf("-------------------------\nProcessor #%d:\n\tSTATUS: 0x%x\n\tBIST:  0x%x\n\tModel: 0x%x\n-------------------------\n", current->generic.processor, current->generic.status, current->bist, current->model_info);
-		current = current->generic.next;
+int smp_switch_to_userspace() {
+	spinlock_lock(&userspace_lock);
+	if (userspace_hold == NULL) {
+		uint8_t *phys = pmm_alloc();
+		memset(phys, 0, PAGE_SIZE);
+		// TODO: Possibly use mwait? Though scheduler will be able to start fairly quickly
+		phys[0] = 0xF3; // M:
+		phys[1] = 0x90; // PAUSE
+		phys[2] = 0xEB; // JMP
+		phys[3] = 0xFC; // M
+		userspace_hold = (uint8_t *)0x00007FFFFFFFF000;
+		pager_map(NULL, (uintptr_t)userspace_hold, ARC_HHDM_TO_PHYS(phys), PAGE_SIZE, 1 << ARC_PAGER_US);
 	}
+	spinlock_unlock(&userspace_lock);
+
+	struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
+
+	register uint64_t rip = (uintptr_t)userspace_hold;
+        register uint64_t rflags = proc->registers.r11 | 0x0200;
+	register uint64_t stack = (uintptr_t)userspace_hold + PAGE_SIZE - 0x8;
+
+	__asm__("mov rcx, %0" : : "r"(rip));
+	__asm__("mov r11, %0" : : "r"(rflags));
+	__asm__("mov rbp, %0" : : "r"(stack));
+	__asm__("mov rsp, %0" : : "r"(stack));
+	__asm__("sysretq");
 
 	return 0;
 }
 
-int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t version) {
+int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t version) {
 	// NOTE: This function is only called from the BSP
-	Arc_ProcessorList[lapic].generic.processor = Arc_ProcessorCounter;
-	Arc_ProcessorList[lapic].generic.acpi_uid = acpi_uid;
-	Arc_ProcessorList[lapic].generic.acpi_flags = acpi_flags;
-	Arc_ProcessorList[lapic].bist = 0x0;
-	Arc_ProcessorList[lapic].model_info = 0x0; // TODO: Set this properly
-	Arc_ProcessorList[last_lapic].generic.next = &Arc_ProcessorList[lapic];
-	last_lapic = lapic;
+	Arc_ProcessorList[processor].acpi_uid = acpi_uid;
+	Arc_ProcessorList[processor].acpi_flags = acpi_flags;
+	Arc_ProcessorList[last_lapic].next = &Arc_ProcessorList[processor];
+	last_lapic = processor;
 
-	if (lapic == (uint32_t)lapic_get_id()) {
+	if (processor == (uint32_t)lapic_get_id()) {
 		// BSP
-		Arc_BootProcessor = &Arc_ProcessorList[lapic];
-		Arc_BootProcessor->generic.status |= 1;
-		Arc_BootProcessor->generic.pl0_stack = (void *)Arc_MainPL0Stack;
+		Arc_ProcessorList[processor].syscall_stack = init_gdt(processor);
+		init_idt();
+		init_syscall();
+
+		Arc_BootProcessor = &Arc_ProcessorList[processor];
+		Arc_BootProcessor->flags |= 1 << ARC_SMP_FLAGS_INIT;
 		Arc_ProcessorCounter++;
-		printf("%p\n", Arc_BootProcessor);
-		__asm__("mov ecx, 0xC0000102; wrmsr" : : "a"((uintptr_t)Arc_BootProcessor) : "rcx");
+		_x86_WRMSR(0xC0000102, (uintptr_t)Arc_BootProcessor);
 
 		return 0;
 	}
@@ -324,10 +340,10 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 
 	// AP start procedure
 	// INIT IPI
-	lapic_ipi(0, lapic, ARC_LAPIC_IPI_INIT | ARC_LAPIC_IPI_ASSERT);
+	lapic_ipi(0, processor, ARC_LAPIC_IPI_INIT | ARC_LAPIC_IPI_ASSERT);
 	while (lapic_ipi_poll()) __asm__("pause");
 	// INIT De-assert IPI
-	lapic_ipi(0, lapic, ARC_LAPIC_IPI_INIT | ARC_LAPIC_IPI_DEASRT);
+	lapic_ipi(0, processor, ARC_LAPIC_IPI_INIT | ARC_LAPIC_IPI_DEASRT);
 	while (lapic_ipi_poll()) __asm__("pause");
 
 	// If (lapic->version != 82489DX)
@@ -335,18 +351,19 @@ int init_smp(uint32_t lapic, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t ve
 		uint8_t vector = (((uintptr_t)code) >> 12) & 0xFF;
 
 		// SIPI
-		lapic_ipi(vector, lapic, ARC_LAPIC_IPI_START | ARC_LAPIC_IPI_ASSERT);
+		lapic_ipi(vector, processor, ARC_LAPIC_IPI_START | ARC_LAPIC_IPI_ASSERT);
 		while (lapic_ipi_poll()) __asm__("pause");
 		// SIPI
-		lapic_ipi(vector, lapic, ARC_LAPIC_IPI_START | ARC_LAPIC_IPI_ASSERT);
+		lapic_ipi(vector, processor, ARC_LAPIC_IPI_START | ARC_LAPIC_IPI_ASSERT);
 		while (lapic_ipi_poll()) __asm__("pause");
 	}
 
+	// TODO: If this flag is not set within a reasonable time, skip this processor
 	while (((info->flags >> 1) & 1) == 0) __asm__("pause");
 
-	Arc_ProcessorList[lapic].bist = info->eax;
-	Arc_ProcessorList[lapic].model_info = info->edx;
+	ARC_DEBUG(INFO, "AP %d BIST: 0x%x\n", processor, info->eax);
 
+	// TODO: If BIST indicates error, shut down AP, move on
 	while ((info->flags & 1) == 0) __asm__("pause");
 
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE);

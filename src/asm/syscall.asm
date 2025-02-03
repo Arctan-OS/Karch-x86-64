@@ -50,12 +50,14 @@ _syscall:
         ;; Change stack
         ;; Unfortunately can't use rdgsbase rax
         mov r11, rcx
-        mov r10, rdx
+        mov r12, rdx
         swapgs
         mov ecx, 0xC0000101
         rdmsr
         mov rcx, r11
-        mov rdx, r10
+        mov rdx, r12
+
+        ;; NOTE: Change segments?
 
         ;; Have to do this silliness as upper 32-bits of processor
         ;; descriptor are not preserved in GS base
@@ -65,10 +67,11 @@ _syscall:
         or rax, r11
         ;; Finally change the stack
         mov r11, rsp
-        mov rsp, qword [rax + 8]
+        mov rsp, qword [rax]
         push r11
         push rbp
         mov rbp, rsp
+        ;; Push previous CR3
         push r10
 
         ;; Call handler
@@ -79,15 +82,14 @@ _syscall:
         call rax
         ;; Preserve RAX from here on, as it contains return code
 
-        ;; Resotre old page tables
+        ;; NOTE: Restore segments?
+
+        ;; Resotre old page tables and stack
         pop r10
-        pop rcx
-        pop rdx
+        pop rbp
+        pop rsp
         mov cr3, r10
 
-        ;; Restore old stack
-        mov rbp, rcx
-        mov rsp, rdx
         swapgs
 
         ;; Restore caller state

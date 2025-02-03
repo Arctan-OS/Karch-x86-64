@@ -39,6 +39,6 @@
  * kernel code, kernel data, user code, user data.
  * */
 
-uintptr_t init_gdt();
+uintptr_t init_gdt(int processor);
 
 #endif

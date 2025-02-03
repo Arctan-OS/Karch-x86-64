@@ -25,7 +25,7 @@
  * @DESCRIPTION
 */
 #include <arch/x86-64/cmos.h>
-#include <arch/x86-64/io/port.h>
+#include <arch/io/port.h>
 
 uint8_t cmos_read(uint8_t reg) {
 	// Disable NMI

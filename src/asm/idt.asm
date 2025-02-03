@@ -41,14 +41,23 @@ _install_idt:
 
 extern interrupt_junction
 %macro common_idt_stub 1
+section .text
 global _idt_stub_%1
 extern generic_interrupt_handler_%1
 _idt_stub_%1:
         PUSH_ALL
         mov rdi, rsp
+
+        ;; NOTE: Change segments?
+
         call generic_interrupt_handler_%1
+
+        ;; NOTE: Restore segments?
+
         POP_ALL
         iretq
+_idt_stub_%1_t0:        dq 0x0
+_idt_stub_%1_t1:        dq 0x0
 %endmacro
 
 common_idt_stub 0
