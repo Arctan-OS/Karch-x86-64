@@ -478,7 +478,7 @@ GENERIC_HANDLER(32) {
 
 	struct ARC_Registers *proc_regs = &processor->registers;
 
-	uintptr_t cr3_change = pager_switch_to_kpages();
+	pager_switch_to_kpages();
 
 	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXSAVE, 1) == 1) {
 		proc_regs->rax = regs->rax;
@@ -559,34 +559,33 @@ GENERIC_HANDLER(32) {
 
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
-	} else if (processor->next_thread != NULL) {
-		// Switch to next thread
-		thread_switch:;
-		if (processor->last_thread != NULL) {
-			smp_context_save(processor, &processor->last_thread->ctx);
-		}
-		printf("switch by: %d\n", processor_id);
-
-		processor->last_thread = processor->current_thread;
-		processor->current_thread = processor->next_thread;
-		processor->next_thread = NULL;
-
-		source = &processor->current_thread->ctx;
-		goto ctx_switch;
 	} else {
-		// Determine next thread
-		// Jump back up
 		sched_tick();
 		struct ARC_Process *proc = sched_get_current_proc();
 
-		if (proc != NULL && proc->nextex != NULL) {
-			cr3_change = ARC_HHDM_TO_PHYS(proc->page_tables);
-			printf("%p\n", cr3_change);
-			processor->next_thread = proc->nextex;
-			proc->nextex = proc->nextex->next;
-			goto thread_switch;
+		if (proc == NULL) {
+			goto skip_threading;
 		}
+
+		struct ARC_Thread *next_thread = process_get_next_thread(proc, processor->current_thread);
+
+		if (next_thread == NULL) {
+			goto skip_threading;
+		}
+
+		if (processor->last_thread != NULL) {
+			smp_context_save(processor, &processor->last_thread->ctx);
+		}
+
+		regs->cr3 = ARC_HHDM_TO_PHYS(proc->page_tables);
+		processor->last_thread = processor->current_thread;
+		processor->current_thread = next_thread;
+		source = &next_thread->ctx;
+
+		goto ctx_switch;
 	}
+
+	skip_threading:;
 
 	mutex_unlock(&processor->register_lock);
 
@@ -603,8 +602,6 @@ GENERIC_HANDLER(32) {
 	}
 
 	mutex_unlock(&processor->timer_lock);
-
-	regs->cr3 = cr3_change;
 
 	GENERIC_HANDLER_POSTAMBLE(32);
 

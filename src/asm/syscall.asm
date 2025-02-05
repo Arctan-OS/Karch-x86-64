@@ -38,41 +38,34 @@ extern Arc_KernelPageTables
 _syscall:
         cli
 
-        ;; Restore caller state
-        PUSH_ALL
-
-        ;; Swap page tables
-        mov r10, cr3
-        lea rax, [rel Arc_KernelPageTables]
-        mov rax, [rax]
-        mov cr3, rax
-
-        ;; Change stack
+        ;; Get stack
         ;; Unfortunately can't use rdgsbase rax
-        mov r11, rcx
-        mov r12, rdx
+        push rcx
+        push rdx
         swapgs
         mov ecx, 0xC0000101
         rdmsr
-        mov rcx, r11
-        mov rdx, r12
-
-        ;; NOTE: Change segments?
+        swapgs
+        pop rdx
+        pop rcx
 
         ;; Have to do this silliness as upper 32-bits of processor
         ;; descriptor are not preserved in GS base
-        xor r11, r11
-        not r11
-        shl r11, 32
-        or rax, r11
+        xor r10, r10
+        not r10
+        shl r10, 32
+        or rax, r10
         ;; Finally change the stack
-        mov r11, rsp
+        mov r10, rsp
         mov rsp, qword [rax]
-        push r11
-        push rbp
-        mov rbp, rsp
-        ;; Push previous CR3
+        ;; Push caller state except RSP
         push r10
+        PUSH_ALL
+
+        ;; Change page tables
+        lea rax, [rel Arc_KernelPageTables]
+        mov rax, [rax]
+        mov cr3, rax
 
         ;; Call handler
         shl rdi, 3
@@ -80,19 +73,16 @@ _syscall:
         add rax, rdi
         mov rax, [rax]
         call rax
+
         ;; Preserve RAX from here on, as it contains return code
 
-        ;; NOTE: Restore segments?
-
-        ;; Resotre old page tables and stack
-        pop r10
-        pop rbp
-        pop rsp
-        mov cr3, r10
-
-        swapgs
-
-        ;; Restore caller state
+        ;; Swap caller RAX for return code
+        pop r11                 ; CR3
+        pop r10                 ; RAX
+        push rax                ; New RAX
+        push r11                ; CR3
+        ;; Restore caller state except RSP
         POP_ALL
+        pop rsp
 
         o64 sysret
