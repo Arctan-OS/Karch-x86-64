@@ -42,10 +42,13 @@ _syscall:
         ;; Unfortunately can't use rdgsbase rax
         push rcx
         push rdx
+        push rax
         swapgs
         mov ecx, 0xC0000101
         rdmsr
         swapgs
+        mov r12, rax
+        pop rax
         pop rdx
         pop rcx
 
@@ -54,25 +57,25 @@ _syscall:
         xor r10, r10
         not r10
         shl r10, 32
-        or rax, r10
+        or r12, r10
         ;; Finally change the stack
         mov r10, rsp
-        mov rsp, qword [rax]
+        mov rsp, qword [r12]
         ;; Push caller state except RSP
         push r10
         PUSH_ALL
 
         ;; Change page tables
-        lea rax, [rel Arc_KernelPageTables]
-        mov rax, [rax]
-        mov cr3, rax
+        lea r12, [rel Arc_KernelPageTables]
+        mov r12, [r12]
+        mov cr3, r12
 
         ;; Call handler
-        shl rdi, 3
-        mov rax, Arc_SyscallTable
-        add rax, rdi
-        mov rax, [rax]
-        call rax
+        shl rax, 3
+        mov r12, Arc_SyscallTable
+        add r12, rax
+        mov r12, [r12]
+        call r12
 
         ;; Preserve RAX from here on, as it contains return code
 

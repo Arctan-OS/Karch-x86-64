@@ -63,9 +63,8 @@ static int syscall_3(struct ARC_SyscallArgs *args) {
 	return 0;
 }
 
-static int syscall_4(struct ARC_SyscallArgs *args) {
-	(void)args;
-	ARC_DEBUG(INFO, "Exiting\n");
+static int syscall_4(int code) {
+	ARC_DEBUG(INFO, "Exiting (%d)\n", code);
 	// EXIT
 	return 0;
 }
@@ -133,7 +132,7 @@ static int syscall_F(struct ARC_SyscallArgs *args) {
 	return 0;
 }
 
-int (*Arc_SyscallTable[])(struct ARC_SyscallArgs *args) = {
+int (*Arc_SyscallTable[])() = {
 	syscall_0,
 	syscall_1,
 	syscall_2,
