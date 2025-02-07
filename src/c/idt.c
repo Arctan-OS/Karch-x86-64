@@ -33,7 +33,7 @@
 #include <arch/x86-64/apic/lapic.h>
 #include <arch/x86-64/context.h>
 #include <arch/smp.h>
-#include <mp/sched/abstract.h>
+#include <mp/scheduler.h>
 #include <arch/pager.h>
 
 #define GENERIC_HANDLER(__vector)					\
