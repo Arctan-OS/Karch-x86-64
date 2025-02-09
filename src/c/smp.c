@@ -254,32 +254,10 @@ uint32_t smp_get_processor_id() {
 }
 
 int smp_switch_to_userspace() {
-	spinlock_lock(&userspace_lock);
-	if (userspace_hold == NULL) {
-		uint8_t *phys = pmm_alloc();
-		memset(phys, 0, PAGE_SIZE);
-		// TODO: Possibly use mwait? Though scheduler will be able to start fairly quickly
-		phys[0] = 0xF3; // M:
-		phys[1] = 0x90; // PAUSE
-		phys[2] = 0xEB; // JMP
-		phys[3] = 0xFC; // M
-		userspace_hold = (uint8_t *)0x00007FFFFFFFF000;
-		pager_map(NULL, (uintptr_t)userspace_hold, ARC_HHDM_TO_PHYS(phys), PAGE_SIZE, 1 << ARC_PAGER_US);
-	}
-	spinlock_unlock(&userspace_lock);
-
-	struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
-
-	register uint64_t rip = (uintptr_t)userspace_hold;
-        register uint64_t rflags = proc->registers.r11 | 0x0200;
-	register uint64_t stack = (uintptr_t)userspace_hold + PAGE_SIZE - 0x8;
-
-	__asm__("mov rcx, %0" : : "r"(rip));
-	__asm__("mov r11, %0" : : "r"(rflags));
-	__asm__("mov rbp, %0" : : "r"(stack));
-	__asm__("mov rsp, %0" : : "r"(stack));
-	__asm__("sysretq");
-
+	// NOTE: For other architectures this may be useful, however on x86-64, the timer
+	//       interrupt can do this work by setting the return SS and CS to be of ones
+	//       that have a privelege level of 3. This function is kept as a way for the
+	//       kernel to explicitly state that all processors are to be switched to userspace
 	return 0;
 }
 

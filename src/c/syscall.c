@@ -65,6 +65,7 @@ static int syscall_3(struct ARC_SyscallArgs *args) {
 
 static int syscall_4(int code) {
 	ARC_DEBUG(INFO, "Exiting (%d)\n", code);
+	term_draw(&Arc_MainTerm);
 	// EXIT
 	return 0;
 }
