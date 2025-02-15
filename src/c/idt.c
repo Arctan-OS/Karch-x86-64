@@ -36,6 +36,11 @@
 #include <mp/scheduler.h>
 #include <arch/pager.h>
 
+// TODO: Using printf in an interrupt (that doesn't panic the kernel) will cause
+//       a deadlock if anything else is printing. So, code that is called from an
+//       interrupt handler should not use printfs. The best way to resolve this is to
+//       make it so that printfs do not deadlock.
+
 #define GENERIC_HANDLER(__vector)					\
 	extern void _idt_stub_##__vector();				\
 	int generic_interrupt_handler_##__vector(struct ARC_Registers *regs)
