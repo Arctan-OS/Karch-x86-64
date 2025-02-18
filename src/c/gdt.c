@@ -96,6 +96,7 @@ struct gdt_entry_container {
 static uint8_t ists[ARC_MAX_PROCESSORS][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE))) = { 0 };
 static uint8_t rsps[ARC_MAX_PROCESSORS][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE))) = { 0 };
 static struct gdt_entry_container gdts[ARC_MAX_PROCESSORS] = { 0 };
+static struct tss_descriptor tsss[ARC_MAX_PROCESSORS] = { 0 };
 
 void set_gdt_gate(struct gdt_entry_container *gdt_entries, int i, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags) {
 	gdt_entries->gdt[i].base1 = (base      ) & 0xFFFF;
@@ -135,16 +136,7 @@ uintptr_t init_gdt(int processor) {
 
 	ARC_DEBUG(INFO, "Installed basic descriptors\n");
 
-	struct tss_descriptor *tss = (struct tss_descriptor *)alloc(sizeof(*tss));
-
-	if (tss == NULL) {
-		ARC_DEBUG(ERR, "Failed to allocate GDT container");
-		memset(Arc_MainTerm.framebuffer, 0, Arc_MainTerm.fb_height * Arc_MainTerm.fb_width * (Arc_MainTerm.fb_bpp / 8));
-		term_draw(&Arc_MainTerm);
-		ARC_HANG;
-	}
-
-	memset(tss, 0, sizeof(*tss));
+	struct tss_descriptor *tss = &tsss[processor];
 
 	set_tss_gate(container, (uint64_t)tss, sizeof(*tss) - 1, 0x89, 0x0);
 

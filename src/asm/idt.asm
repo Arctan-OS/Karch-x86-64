@@ -39,20 +39,25 @@ _install_idt:
 
 %include "src/asm/context.asm"
 
-extern interrupt_junction
+extern Arc_KernelPageTables
 %macro common_idt_stub 1
 section .text
 global _idt_stub_%1
 extern generic_interrupt_handler_%1
 _idt_stub_%1:
         PUSH_ALL
+
         mov rdi, rsp
 
-        ;; NOTE: Change segments?
+        mov ax, 0x10
+        mov ss, ax
+
+        ;; Change page tables
+        lea r12, [rel Arc_KernelPageTables]
+        mov r12, [r12]
+        mov cr3, r12
 
         call generic_interrupt_handler_%1
-
-        ;; NOTE: Restore segments?
 
         POP_ALL
         iretq

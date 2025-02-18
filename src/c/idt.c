@@ -565,27 +565,21 @@ GENERIC_HANDLER(32) {
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
 	} else {
-		sched_tick();
-		struct ARC_Process *proc = sched_get_current_proc();
+		struct ARC_Thread *thread= sched_tick();
 
-		if (proc == NULL) {
+		if (thread == NULL && (thread = sched_get_current_thread()) == NULL) {
 			goto skip_threading;
 		}
 
-		struct ARC_Thread *next_thread = process_get_next_thread(proc, processor->current_thread);
-
-		if (next_thread == NULL) {
-			goto skip_threading;
-		}
 
 		if (processor->last_thread != NULL) {
 			smp_context_save(processor, &processor->last_thread->ctx);
 		}
 
-		regs->cr3 = ARC_HHDM_TO_PHYS(proc->page_tables);
+		regs->cr3 = ARC_HHDM_TO_PHYS(processor->current_process->page_tables);
 		processor->last_thread = processor->current_thread;
-		processor->current_thread = next_thread;
-		source = &next_thread->ctx;
+		processor->current_thread = thread;
+		source = &thread->ctx;
 
 		goto ctx_switch;
 	}

@@ -27,6 +27,8 @@
 #include <global.h>
 #include <arch/x86-64/syscall.h>
 #include <arch/x86-64/ctrl_regs.h>
+#include <mp/scheduler.h>
+#include <arch/smp.h>
 #include <stdint.h>
 
 struct ARC_SyscallArgs {
@@ -64,8 +66,10 @@ static int syscall_3(struct ARC_SyscallArgs *args) {
 }
 
 static int syscall_4(int code) {
-	ARC_DEBUG(INFO, "Exiting (%d)\n", code);
+	ARC_DEBUG(INFO, "Exiting (%d, %d)\n", code, smp_get_processor_id());
 	term_draw(&Arc_MainTerm);
+//	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
+//	sched_dequeue(desc->current_process);
 	// EXIT
 	return 0;
 }
