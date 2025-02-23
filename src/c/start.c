@@ -27,11 +27,15 @@
 #include <arch/start.h>
 #include <arch/acpi/acpi.h>
 #include <arch/pci/pci.h>
+#include <arch/process.h>
+#include <arch/smp.h>
 
 #include <arch/x86-64/gdt.h>
 #include <arch/x86-64/idt.h>
 #include <arch/x86-64/syscall.h>
 #include <arch/x86-64/apic/apic.h>
+
+struct ARC_Process *Arc_ProcessorHold = NULL;
 
 int init_arch() {
         if (init_acpi() != 0) {
@@ -48,6 +52,25 @@ int init_arch() {
 	if (init_pci() != 0) {
 		return -2;
 	}
+
+	Arc_ProcessorHold = process_create(0, NULL);
+
+	if (Arc_ProcessorHold == NULL) {
+		ARC_DEBUG(ERR, "Failed to create hold process\n");
+		__asm__("cli");
+		ARC_HANG;
+	}
+
+	struct ARC_Thread *hold = thread_create(Arc_ProcessorHold->page_tables, (void *)smp_hold, 0);
+
+	if (hold == NULL) {
+		ARC_DEBUG(ERR, "Failed to create hold thread\n");
+		process_delete(Arc_ProcessorHold);
+		__asm__("cli");
+		ARC_HANG;
+	}
+
+	process_associate_thread(Arc_ProcessorHold, hold);
 
 	return 0;
 }

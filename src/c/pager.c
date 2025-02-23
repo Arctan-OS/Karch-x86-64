@@ -239,6 +239,18 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	return 0;
 }
 
+void *pager_create_page_tables() {
+	void *tables = pmm_alloc();
+
+	if (tables == NULL) {
+		return NULL;
+	}
+
+	memset(tables, 0, PAGE_SIZE);
+
+	return tables;
+}
+
 static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {
 	if (info == NULL || table == NULL || level == 0) {
 		return -1;

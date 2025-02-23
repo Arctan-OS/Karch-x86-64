@@ -35,6 +35,7 @@
 #include <arch/smp.h>
 #include <mp/scheduler.h>
 #include <arch/pager.h>
+#include <arch/start.h>
 
 // TODO: Using printf in an interrupt (that doesn't panic the kernel) will cause
 //       a deadlock if anything else is printing. So, code that is called from an
@@ -565,12 +566,16 @@ GENERIC_HANDLER(32) {
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
 	} else {
-		struct ARC_Thread *thread= sched_tick();
-
-		if (thread == NULL && (thread = sched_get_current_thread()) == NULL) {
+		if (sched_tick() == -2) {
 			goto skip_threading;
 		}
 
+		struct ARC_Thread *thread = sched_get_current_thread();
+
+		if (thread == NULL) {
+			processor->current_process = Arc_ProcessorHold;
+			thread = Arc_ProcessorHold->threads;
+		}
 
 		if (processor->last_thread != NULL) {
 			smp_context_save(processor, &processor->last_thread->ctx);

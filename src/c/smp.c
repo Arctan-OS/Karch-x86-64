@@ -71,8 +71,10 @@ uint32_t Arc_ProcessorCounter = 0;
 struct ARC_ProcessorDescriptor *Arc_BootProcessor = NULL;
 
 static uint32_t last_lapic = 0;
-static uint8_t *userspace_hold = NULL;
-static ARC_GenericSpinlock userspace_lock = 0;
+
+void __attribute__((naked)) smp_hold() {
+	ARC_HANG;
+}
 
 /**
  * Further initialize the application processor to synchronize with the BSP.
@@ -111,15 +113,11 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 
 	info->flags |= 1;
 
-	smp_hold(&Arc_ProcessorList[id]);
+	smp_hold();
 
 	return 0;
 }
 
-int smp_hold(struct ARC_ProcessorDescriptor *processor) {
-	processor->flags |= 1 << ARC_SMP_FLAGS_HOLD;
-	ARC_HANG;
-}
 
 int smp_context_write(struct ARC_ProcessorDescriptor *processor, struct ARC_Registers *regs) {
 	if (processor == NULL || regs == NULL) {
