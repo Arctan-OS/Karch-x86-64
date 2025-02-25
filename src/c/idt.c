@@ -25,6 +25,8 @@
  * @DESCRIPTION
  * The file which handles the 64-bit IDT.
 */
+#include "arch/thread.h"
+#include "lib/atomics.h"
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
 #include <arch/x86-64/idt.h>
@@ -585,7 +587,12 @@ GENERIC_HANDLER(32) {
 		processor->last_thread = processor->current_thread;
 		processor->current_thread = thread;
 		source = &thread->ctx;
-
+		
+		if (processor->last_thread != NULL) {
+			uint32_t expected = ARC_THREAD_RUNNING;
+			ARC_ATOMIC_CMPXCHG(&processor->last_thread->state, &expected, ARC_THREAD_READY);
+		}
+		
 		goto ctx_switch;
 	}
 
