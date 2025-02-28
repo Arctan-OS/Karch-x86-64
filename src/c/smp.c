@@ -220,7 +220,7 @@ int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, i
 }
 
 int smp_jmp(struct ARC_ProcessorDescriptor *processor, void *function, int argc, ...) {
-	mutex_lock(&processor->register_lock);
+	spinlock_lock(&processor->register_lock);
 
 	va_list args;
 	va_start(args, argc);
@@ -229,7 +229,7 @@ int smp_jmp(struct ARC_ProcessorDescriptor *processor, void *function, int argc,
 
 	processor->registers.rip = (uintptr_t)function;
 
-	mutex_unlock(&processor->register_lock);
+	spinlock_unlock(&processor->register_lock);
 
 	processor->flags &= ~(1 << ARC_SMP_FLAGS_HOLD);
 	processor->flags |= 1 << ARC_SMP_FLAGS_CTXWRITE;

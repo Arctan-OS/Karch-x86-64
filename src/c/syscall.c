@@ -68,8 +68,8 @@ static int syscall_3(struct ARC_SyscallArgs *args) {
 static int syscall_4(int code) {
 	ARC_DEBUG(INFO, "Exiting (%d, %d)\n", code, smp_get_processor_id());
 	term_draw(&Arc_MainTerm);
-//	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
-//	sched_dequeue(desc->current_process);
+	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
+	sched_dequeue(desc->current_process);
 	// EXIT
 	return 0;
 }

@@ -47,8 +47,6 @@ int init_arch() {
 		ARC_HANG;
 	}
 
-	__asm__("sti");
-
 	if (init_pci() != 0) {
 		return -2;
 	}

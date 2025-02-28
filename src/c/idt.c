@@ -568,22 +568,20 @@ GENERIC_HANDLER(32) {
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
 	} else {
-		if (sched_tick() == -2) {
+		int r = sched_tick();
+		if (r == -2) {
 			goto skip_threading;
+		} else if (r == 1) {
+			lapic_ipi(32, 0, 0b11 << 18);
 		}
 
 		struct ARC_Thread *thread = sched_get_current_thread();
-
-		if (thread == NULL) {
-			processor->current_process = Arc_ProcessorHold;
-			thread = Arc_ProcessorHold->threads;
-		}
 
 		if (processor->last_thread != NULL) {
 			smp_context_save(processor, &processor->last_thread->ctx);
 		}
 
-		regs->cr3 = ARC_HHDM_TO_PHYS(processor->current_process->page_tables);
+		regs->cr3 = ARC_HHDM_TO_PHYS(processor->current_process->process->page_tables);
 		processor->last_thread = processor->current_thread;
 		processor->current_thread = thread;
 		source = &thread->ctx;
@@ -598,9 +596,9 @@ GENERIC_HANDLER(32) {
 
 	skip_threading:;
 
-	mutex_unlock(&processor->register_lock);
+	spinlock_unlock(&processor->register_lock);
 
-	mutex_lock(&processor->timer_lock);
+	spinlock_lock(&processor->timer_lock);
 
 	if (processor->timer_mode == ARC_LAPIC_TIMER_ONESHOT) {
 		lapic_refresh_timer(processor->timer_ticks);
@@ -612,7 +610,7 @@ GENERIC_HANDLER(32) {
 		processor->flags &= ~(1 << 2);
 	}
 
-	mutex_unlock(&processor->timer_lock);
+	spinlock_unlock(&processor->timer_lock);
 
 	GENERIC_HANDLER_POSTAMBLE(32);
 
