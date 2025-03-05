@@ -47,7 +47,8 @@
 #define TWO_MIB 0x200000
 
 struct pager_traverse_info {
-	void *page_tables;
+	uint64_t *src_table;
+	uint64_t *dest_table;
 	uintptr_t virtual;
 	uintptr_t physical;
 	size_t size;
@@ -61,7 +62,7 @@ struct pager_traverse_info {
 uintptr_t Arc_KernelPageTables = 0;
 static uint64_t *pml4 = NULL;
 
-uint64_t get_entry_bits(int level, uint32_t attributes) {
+uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	// Level 0: Page
 	// Level 1: PT
 	// Level 2: PD
@@ -69,9 +70,11 @@ uint64_t get_entry_bits(int level, uint32_t attributes) {
 	// Level 4: PML4
 
 	uint64_t bits = 0;
-
+	
 	bits |= ((attributes >> (ARC_PAGER_PAT)) & 1) << 2; // PWT
 	bits |= ((attributes >> (ARC_PAGER_PAT + 1)) & 1) << 3; // PCD
+
+	int us_rw_overwrite = (level > MASKED_READ(attributes, ARC_PAGER_AUTO_USRW_DISABLE, 0xF) + 1);
 
 	switch (level) {
 		case 1: {
@@ -86,6 +89,7 @@ uint64_t get_entry_bits(int level, uint32_t attributes) {
 			bits |= ((attributes >> (ARC_PAGER_PAT + 2)) & 1) << 12;
 			// 2MiB pages unless 4K specified
 			if (((attributes >> ARC_PAGER_RESV1) & 1) == 1) {
+				us_rw_overwrite = 0;
 				bits |= (!((attributes >> (ARC_PAGER_4K)) & 1)) << 7;
 			}
 
@@ -97,6 +101,7 @@ uint64_t get_entry_bits(int level, uint32_t attributes) {
 			bits |= ((attributes >> (ARC_PAGER_PAT + 2)) & 1) << 12;
 			// 1GiB pages unless 4K specified
  			if (((attributes >> ARC_PAGER_RESV0) & 1) == 1) {
+				us_rw_overwrite = 0;
 				bits |= (!((attributes >> (ARC_PAGER_4K)) & 1)) << 7;
 			}
 
@@ -106,8 +111,14 @@ uint64_t get_entry_bits(int level, uint32_t attributes) {
 		// On 4, 5, bit 7 is reserved
 	}
 
-	bits |= ((attributes >> ARC_PAGER_US) & 1) << 2;
-	bits |= ((attributes >> ARC_PAGER_RW) & 1) << 1;
+	// NOTE: The logic of us_rw_overwrite is such that all page directories
+	//       (PT, PD, PDP, ...) have write enabled on them and are user accessible
+	//       this allows for more granular mapping such that a fault isn't given
+	//       on writeable page that just so happens to be located in a read only
+	//       page table. This may prove to be a little less efficient when it comes
+	//       to looking things up
+	bits |= (((attributes >> ARC_PAGER_US) & 1) | us_rw_overwrite) << 2;
+	bits |= (((attributes >> ARC_PAGER_RW) & 1) | us_rw_overwrite) << 1;
 	bits |= 1; // Present
 
 	if ((Arc_BootMeta->paging_features & FLAGS_NO_EXEC) == 1) {
@@ -140,7 +151,7 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 	bool can_mib = (attributes >> ARC_PAGER_RESV1) & 1;
 	bool no_create = (attributes >> ARC_PAGER_RESV2) & 1;
 
-	if (!present && (only_4k || (level == 4 && !can_gib) || (level == 3 && !can_mib) || level == 2) && !no_create) {
+	if (!present && (only_4k || (level == 4 && !can_gib) || (level == 3 && !can_mib) || level == 2) && !no_create && level != 1) {
 		// Only make a new table if:
 		//     The current entry is not present AND:
 		//         - Mapping is only 4K, or
@@ -156,7 +167,6 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		}
 
 		memset(address, 0, PAGE_SIZE);
-
 		parent[index] = (uintptr_t)ARC_HHDM_TO_PHYS(address) | get_entry_bits(level, attributes);
 	}
 
@@ -171,7 +181,7 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
  * @return zero on success.
  * */
 static int pager_traverse(struct pager_traverse_info *info, int (*callback)(struct pager_traverse_info *info, uint64_t *table, int index, int level)) {
-	if (info == NULL || info->page_tables == NULL) {
+	if (info == NULL || info->src_table == NULL) {
 		return -1;
 	}
 
@@ -182,7 +192,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	uintptr_t target = info->virtual + info->size;
 
 	while (info->virtual < target) {
-		uint64_t *table = info->page_tables;
+		uint64_t *table = info->src_table;
 		int index = get_page_table(table, 4, info->virtual, info->attributes);
 		info->pml4e = index;
 
@@ -258,7 +268,7 @@ static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table,
 
 	table[index] = info->physical | get_entry_bits(level, info->attributes);
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -268,7 +278,7 @@ static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table,
 int pager_map(void *page_tables, uintptr_t virtual, uintptr_t physical, size_t size, uint32_t attributes) {
 	struct pager_traverse_info info = { .virtual = virtual, .physical = physical,
 	                                    .size = size, .attributes = attributes,
-					    .page_tables = page_tables == NULL ? pml4 : page_tables };
+					    .src_table = page_tables == NULL ? pml4 : page_tables };
 
 	if (pager_traverse(&info, pager_map_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map P0x%"PRIx64":V0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", physical, virtual, size, attributes);
@@ -285,7 +295,7 @@ static int pager_unmap_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	table[index] = 0;
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -293,7 +303,7 @@ static int pager_unmap_callback(struct pager_traverse_info *info, uint64_t *tabl
 }
 
 int pager_unmap(void *page_tables, uintptr_t virtual, size_t size) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .page_tables = page_tables == NULL ? pml4 : page_tables};
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .src_table = page_tables == NULL ? pml4 : page_tables};
 
 	if (pager_traverse(&info, pager_unmap_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map V0x%"PRIx64" (0x%"PRIx64" B)\n", virtual, size);
@@ -305,18 +315,20 @@ int pager_unmap(void *page_tables, uintptr_t virtual, size_t size) {
 
 static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {
 	if (info == NULL || table == NULL || level == 0) {
+		ARC_DEBUG(ERR, "Invalid parameters\n");
 		return -1;
 	}
 
 	void *page = pmm_alloc();
 
 	if (page == NULL) {
+		ARC_DEBUG(ERR, "Failed to allocate a page\n");
 		return -2;
 	}
 
 	table[index] = ARC_HHDM_TO_PHYS(page) | get_entry_bits(level, info->attributes);
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -325,7 +337,7 @@ static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *ta
 
 int pager_fly_map(void *page_tables, uintptr_t virtual, size_t size, uint32_t attributes) {
 	attributes |= 1 << ARC_PAGER_4K;
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .page_tables = page_tables == NULL ? pml4 : page_tables };
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .src_table = page_tables == NULL ? pml4 : page_tables };
 
 	if (pager_traverse(&info, pager_fly_map_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to fly map 0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", virtual, size, attributes);
@@ -343,7 +355,7 @@ static int pager_fly_unmap_callback(struct pager_traverse_info *info, uint64_t *
 	pmm_free((void *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK));
 	table[index] = 0;
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -351,7 +363,7 @@ static int pager_fly_unmap_callback(struct pager_traverse_info *info, uint64_t *
 }
 
 int pager_fly_unmap(void *page_tables, uintptr_t virtual, size_t size) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .page_tables = page_tables == NULL ? pml4 : page_tables };
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .src_table = page_tables == NULL ? pml4 : page_tables };
 
 	if (pager_traverse(&info, pager_fly_unmap_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to map V0x%"PRIx64" (0x%"PRIx64" B)\n", virtual, size);
@@ -369,7 +381,7 @@ static int pager_set_attr_callback(struct pager_traverse_info *info, uint64_t *t
 	uint64_t address = table[index] & ADDRESS_MASK;
 	table[index] = address | get_entry_bits(level, info->attributes);
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -377,7 +389,7 @@ static int pager_set_attr_callback(struct pager_traverse_info *info, uint64_t *t
 }
 
 int pager_set_attr(void *page_tables, uintptr_t virtual, size_t size, uint32_t attributes) {
-	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .page_tables = page_tables == NULL ? pml4 : page_tables };
+	struct pager_traverse_info info = { .virtual = virtual, .size = size, .attributes = attributes, .src_table = page_tables == NULL ? pml4 : page_tables };
 
 	if (pager_traverse(&info, pager_set_attr_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to set attr V0x%"PRIx64" (0x%"PRIx64" B, 0x%x)\n", virtual, size, attributes);
@@ -393,7 +405,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	uint64_t *pml3 = NULL;
-	if ((pml3 = (uint64_t *)(pml4[info->pml4e] & ADDRESS_MASK)) == NULL) {
+	if ((pml3 = (uint64_t *)(info->dest_table[info->pml4e] & ADDRESS_MASK)) == NULL) {
 		return 0;
 	}
 
@@ -447,16 +459,24 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	basic_quit:;
 
-	if (info->page_tables == pml4) {
+	if (info->src_table == pml4) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
 	return 0;
 }
 
-int pager_clone(void *page_tables, uintptr_t virt_src, uintptr_t virt_dest, size_t size) {
-	// Always clones from current CR3
-	struct pager_traverse_info info = { .physical = virt_src, .virtual = virt_dest, .size = size, .page_tables = page_tables == NULL ? pml4 : page_tables };
+int pager_clone(void *_page_tables, uintptr_t virt_src, uintptr_t virt_dest, size_t size, int source) {
+	// source = 0: copy from current page tables to page_tables
+	// source = 1: copy from page_tables to current page tables
+
+	void *page_tables = _page_tables == NULL ? pml4 : _page_tables;
+
+	void *src_table = source ? page_tables : pml4;
+	void *dest_table = source ? pml4 : page_tables;
+
+	struct pager_traverse_info info = { .physical = virt_src, .virtual = virt_dest, .size = size,
+					    .src_table = src_table, .dest_table = dest_table };
 
 	if (pager_traverse(&info, pager_clone_callback) != 0) {
 		ARC_DEBUG(ERR, "Failed to clone V0x%"PRIx64" to V0x%"PRIx64" for %lu bytes\n", virt_src, virt_dest, size);

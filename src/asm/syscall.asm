@@ -66,9 +66,9 @@ _syscall:
         PUSH_ALL
 
         ;; Change page tables
-        lea r12, [rel Arc_KernelPageTables]
-        mov r12, [r12]
-        mov cr3, r12
+        ;lea r12, [rel Arc_KernelPageTables]
+        ;mov r12, [r12]
+        ;mov cr3, r12
 
         ;; Call handler
         shl rax, 3

@@ -34,6 +34,7 @@
 #include <arch/x86-64/idt.h>
 #include <arch/x86-64/syscall.h>
 #include <arch/x86-64/apic/apic.h>
+#include <arch/x86-64/sse.h>
 
 struct ARC_Process *Arc_ProcessorHold = NULL;
 
@@ -69,6 +70,8 @@ int init_arch() {
 	}
 
 	process_associate_thread(Arc_ProcessorHold, hold);
+
+	init_sse();
 
 	return 0;
 }

@@ -31,132 +31,115 @@
 #include <arch/smp.h>
 #include <stdint.h>
 
-struct ARC_SyscallArgs {
-	uint64_t a;
-	uint64_t b;
-	uint64_t c;
-	uint64_t d;
-	uint64_t e;
-	uint64_t f;
-	uint64_t g;
-}__attribute__((packed));
-
-
-static int syscall_0(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_tcb_set(void *arg) {
+	printf("TCB Set\n");
 	// TCB_SET
 	return 0;
 }
 
-static int syscall_1(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_futex_wait(int *ptr, int expected, struct timespec const *time) {
+	printf("Futex wait\n");
 	// FUTEX_WAIT
 	return 0;
 }
-static int syscall_2(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_futex_wake(int *ptr) {
+	printf("Futex wake\n");
 	// FUTEX_WAKE
 	return 0;
 }
 
-static int syscall_3(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_clock_get(int a, long *b, long *c) {
+	printf("Syscall clock get\n");
 	// CLOCK_GET
 	return 0;
 }
 
-static int syscall_4(int code) {
-	ARC_DEBUG(INFO, "Exiting (%d, %d)\n", code, smp_get_processor_id());
-	term_draw(&Arc_MainTerm);
+static int syscall_exit(int code) {
+	ARC_DEBUG(INFO, "Exiting %d\n", code);
 	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
 	sched_dequeue(desc->current_process);
-	// EXIT
+	
 	return 0;
 }
 
-static int syscall_5(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_seek(int fd, long offset, int whence, long *new_offset) {
+	printf("Seek\n");
 	// SEEK
 	return 0;
 }
-static int syscall_6(struct ARC_SyscallArgs *args) {
-	(void)args;
+
+static int syscall_write(int fd, void const *a, unsigned long b, long *c) {
+	printf("Writing\n");
 	// WRITE
 	return 0;
 }
 
-static int syscall_7(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_read(int fd, void *buf, unsigned long count, long *bytes_read) {
+	printf("Reading\n");
 	// READ
 	return 0;
 }
 
-static int syscall_8(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_close(int fd) {
+	printf("Closing\n");
 	// CLOSE
 	return 0;
 }
 
-static int syscall_9(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_open(char const *name, int flags, unsigned int mode, int *fd) {
+	printf("Opening\n");
 	// OPEN
 	return 0;
 }
-static int syscall_A(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_vm_map(void *hint, unsigned long size, int prot, int flags, int fd, long offset, void **window) {
+	printf("Mapping\n");
 	// VM_MAP
 	return 0;
 }
 
-static int syscall_B(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_vm_unmap(void *a, unsigned long b) {
+	printf("Unmapping\n");
 	// VM_UNMAP
 	return 0;
 }
 
-static int syscall_C(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_anon_alloc(unsigned long size, void **ptr) {
+	printf("Allocating\n");
 	// ANON_ALLOC
 	return 0;
 }
 
-static int syscall_D(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_anon_free(void *ptr, unsigned long size) {
+	printf("Freeing\n");
 	// ANON_FREE
 	return 0;
 }
 
-static int syscall_E(struct ARC_SyscallArgs *args) {
-	(void)args;
+static int syscall_libc_log(const char *str) {
 	// LIBC LOG
-	return 0;
-}
-
-static int syscall_F(struct ARC_SyscallArgs *args) {
-	(void)args;
+	printf("%s\n", str);
 	return 0;
 }
 
 int (*Arc_SyscallTable[])() = {
-	syscall_0,
-	syscall_1,
-	syscall_2,
-	syscall_3,
-	syscall_4,
-	syscall_5,
-	syscall_6,
-	syscall_7,
-	syscall_8,
-	syscall_9,
-	syscall_A,
-	syscall_B,
-	syscall_C,
-	syscall_D,
-	syscall_E,
-	syscall_F
+	[0] = syscall_tcb_set,
+	[1] = syscall_futex_wait,
+	[2] = syscall_futex_wake,
+	[3] = syscall_clock_get,
+	[4] = syscall_exit,
+	[5] = syscall_seek,
+	[6] = syscall_write,
+	[7] = syscall_read,
+	[8] = syscall_close,
+	[9] = syscall_open,
+	[10] = syscall_vm_map,
+	[11] = syscall_vm_unmap,
+	[12] = syscall_anon_alloc,
+	[13] = syscall_anon_free,
+	[14] = syscall_libc_log,
 };
 
-extern int _syscall(uint64_t code, struct ARC_SyscallArgs *args);
+extern int _syscall();
 int init_syscall() {
 	uint64_t ia32_fmask = 0;
 	_x86_WRMSR(0xC0000084, ia32_fmask);
