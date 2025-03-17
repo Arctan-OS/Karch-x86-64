@@ -311,7 +311,7 @@ GENERIC_HANDLER(13) {
 GENERIC_HANDLER(14) {
 	GENERIC_EXCEPTION_PREAMBLE(14);
 
-	struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
+	// struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
 	
 	_x86_getCR2();
 	// if (interrupt_frame->cs == 0x08 && proc->current_process != NULL) {
