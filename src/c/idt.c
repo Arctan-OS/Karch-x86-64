@@ -575,7 +575,7 @@ GENERIC_HANDLER(32) {
 		interrupt_frame->rip = source->rip;
 		interrupt_frame->rflags = source->rflags;
 		interrupt_frame->ss = source->ss;
-
+		
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
 	} else {

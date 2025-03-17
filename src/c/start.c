@@ -24,6 +24,7 @@
  *
  * @DESCRIPTION
 */
+#include "loaders/elf.h"
 #include <arch/start.h>
 #include <arch/acpi/acpi.h>
 #include <arch/pci/pci.h>
