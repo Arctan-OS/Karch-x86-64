@@ -65,7 +65,7 @@ int init_sse() {
 	if (((ecx >> 27) & 1) == 1) {
 		_x86_CR4 |= (1 << 18); // OSXSAVE support
 		_x86_setCR4();
-		void *fxsave_space = pmm_alloc();
+		void *fxsave_space = pmm_alloc_page();
 
 		if (fxsave_space == NULL) {
 			ARC_DEBUG(ERR, "Failed to a llocated FXSAVE space\n");

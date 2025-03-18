@@ -28,7 +28,6 @@
 #include <global.h>
 #include <mm/allocator.h>
 #include <arch/pager.h>
-#include <mm/vmm.h>
 #include <stdint.h>
 
 uint32_t ioapic_read_register(struct ioapic_register *ioapic, uint32_t reg) {
