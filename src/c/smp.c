@@ -38,7 +38,7 @@
 #include <arch/x86-64/idt.h>
 #include <arch/smp.h>
 #include <arch/start.h>
-#include <arch/x86-64/syscall.h>
+#include <arch/syscall.h>
 
 struct ap_start_info {
 	uint64_t pml4;

@@ -1,5 +1,5 @@
 /**
- * @file syscall.h
+ * @file util.h
  *
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
@@ -24,9 +24,9 @@
  *
  * @DESCRIPTION
 */
-#ifndef ARC_ARCH_X86_64_SYSCALL
-#define ARC_ARCH_X86_64_SYSCALL
+#ifndef ARC_ARCH_X86_64_UTIL_H
+#define ARC_ARCH_X86_64_UTIL_H
 
-int init_syscall();
+#define ARC_HANG __asm__("1: hlt; jmp 1b");
 
 #endif

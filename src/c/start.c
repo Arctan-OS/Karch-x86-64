@@ -24,7 +24,6 @@
  *
  * @DESCRIPTION
 */
-#include "loaders/elf.h"
 #include <arch/start.h>
 #include <arch/acpi/acpi.h>
 #include <arch/pci/pci.h>
@@ -33,7 +32,6 @@
 
 #include <arch/x86-64/gdt.h>
 #include <arch/x86-64/idt.h>
-#include <arch/x86-64/syscall.h>
 #include <arch/x86-64/apic/apic.h>
 #include <arch/x86-64/sse.h>
 
