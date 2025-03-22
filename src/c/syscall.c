@@ -24,6 +24,9 @@
  *
  * @DESCRIPTION
 */
+#include "arch/io/port.h"
+#include "interface/printf.h"
+#include "mm/pmm.h"
 #include <global.h>
 #include <arch/x86-64/syscall.h>
 #include <arch/x86-64/ctrl_regs.h>
@@ -153,6 +156,8 @@ static int syscall_vm_unmap(void *a, unsigned long b) {
 static int syscall_anon_alloc(unsigned long size, void **ptr) {
 	(void)size;
 	(void)ptr;
+
+	void *allocation = pmm_alloc_page();
 
 	printf("Allocating\n");
 	// ANON_ALLOC

@@ -26,6 +26,7 @@
  * The file which handles the 64-bit IDT.
 */
 #include "arch/thread.h"
+#include "arctan.h"
 #include "lib/atomics.h"
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
@@ -311,23 +312,22 @@ GENERIC_HANDLER(13) {
 GENERIC_HANDLER(14) {
 	GENERIC_EXCEPTION_PREAMBLE(14);
 
-	// struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
+	struct ARC_ProcessorDescriptor *proc = smp_get_proc_desc();
 	
 	_x86_getCR2();
-	// if (interrupt_frame->cs == 0x08 && proc->current_process != NULL) {
-	// 	pager_clone(proc->current_process->process->page_tables, _x86_CR2, _x86_CR2, PAGE_SIZE, 1);
-	// } else {
-	// }
+	if (interrupt_frame->cs == 0x08 && proc->current_process != NULL) {
+		pager_clone(proc->current_process->process->page_tables, _x86_CR2, _x86_CR2, PAGE_SIZE, 0);
+	} else {
+		(void)interrupt_error_code;
+		GENERIC_EXCEPTION_REG_DUMP(14);
+		printf("CR2: 0x%016"PRIx64"\n", _x86_CR2);
+		_x86_getCR3();
+		printf("CR3: 0x%016"PRIx64"\n", _x86_CR3);
+		spinlock_unlock(&panic_lock);
+		ARC_HANG;
+	}
 	
-	(void)interrupt_error_code;
-	GENERIC_EXCEPTION_REG_DUMP(14);
-	printf("CR2: 0x%016"PRIx64"\n", _x86_CR2);
-	_x86_getCR3();
-	printf("CR3: 0x%016"PRIx64"\n", _x86_CR3);
-	spinlock_unlock(&panic_lock);
-	ARC_HANG;
-
-	// GENERIC_HANDLER_POSTAMBLE(32);
+	GENERIC_HANDLER_POSTAMBLE(32);
 
 	return 0;
 }

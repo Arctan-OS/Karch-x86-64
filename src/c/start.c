@@ -61,7 +61,15 @@ int init_arch() {
 		ARC_HANG;
 	}
 
-	struct ARC_Thread *hold = thread_create(Arc_ProcessorHold->page_tables, (void *)smp_hold, 0);
+	Arc_ProcessorHold->allocator = init_vmm((void *)0x1000, 0x10000);
+
+	if (Arc_ProcessorHold->allocator == NULL) {
+		ARC_DEBUG(ERR, "Failed to create hold process allocator\n");
+		__asm__("cli");
+		ARC_HANG;
+	}
+
+	struct ARC_Thread *hold = thread_create(Arc_ProcessorHold->allocator, Arc_ProcessorHold->page_tables, (void *)smp_hold, 0x1000);
 
 	if (hold == NULL) {
 		ARC_DEBUG(ERR, "Failed to create hold thread\n");
