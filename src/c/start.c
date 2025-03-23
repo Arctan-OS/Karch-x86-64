@@ -35,8 +35,6 @@
 #include <arch/x86-64/apic/apic.h>
 #include <arch/x86-64/sse.h>
 
-struct ARC_Process *Arc_ProcessorHold = NULL;
-
 int init_arch() {
         if (init_acpi() != 0) {
 		return -1;
@@ -50,35 +48,6 @@ int init_arch() {
 	if (init_pci() != 0) {
 		return -2;
 	}
-
-	Arc_ProcessorHold = process_create(0, NULL);
-
-	if (Arc_ProcessorHold == NULL) {
-		ARC_DEBUG(ERR, "Failed to create hold process\n");
-		__asm__("cli");
-		ARC_HANG;
-	}
-
-	Arc_ProcessorHold->allocator = init_vmm((void *)0x1000, 0x10000);
-
-	if (Arc_ProcessorHold->allocator == NULL) {
-		ARC_DEBUG(ERR, "Failed to create hold process allocator\n");
-		__asm__("cli");
-		ARC_HANG;
-	}
-
-	struct ARC_Thread *hold = thread_create(Arc_ProcessorHold->allocator, Arc_ProcessorHold->page_tables, (void *)smp_hold, 0x1000);
-
-	if (hold == NULL) {
-		ARC_DEBUG(ERR, "Failed to create hold thread\n");
-		process_delete(Arc_ProcessorHold);
-		__asm__("cli");
-		ARC_HANG;
-	}
-
-	process_associate_thread(Arc_ProcessorHold, hold);
-
-	init_sse();
 
 	return 0;
 }
