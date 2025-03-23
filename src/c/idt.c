@@ -25,9 +25,9 @@
  * @DESCRIPTION
  * The file which handles the 64-bit IDT.
 */
-#include "arch/thread.h"
-#include "arctan.h"
-#include "lib/atomics.h"
+#include <userspace/thread.h>
+#include <arctan.h>
+#include <lib/atomics.h>
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
 #include <arch/x86-64/idt.h>

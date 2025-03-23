@@ -27,7 +27,6 @@
 #include <arch/start.h>
 #include <arch/acpi/acpi.h>
 #include <arch/pci/pci.h>
-#include <arch/process.h>
 #include <arch/smp.h>
 
 #include <arch/x86-64/gdt.h>
