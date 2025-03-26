@@ -30,24 +30,13 @@ bits 64
 section .text
 
 %macro GET_DATA 2
-    push rax
-    push rsi
-    lea rsi, [rel %1]
     mov rax, %2
-    mov [rsi], rax
-    pop rsi
-    pop rax
     ret
 %endmacro
 
 %macro SET_DATA 2
-    push rax
-    push rsi
-    lea rsi, [rel %1]
-    mov rax, [rsi]
+    mov rax, rdi
     mov %2, rax
-    pop rsi
-    pop rax
     ret
 %endmacro
 
@@ -109,21 +98,3 @@ _x86_WRMSR:
         mov edx, esi
         wrmsr
         ret
-
-    
-section .bss
-global _x86_CR0
-global _x86_CR1
-global _x86_CR2
-global _x86_CR3
-global _x86_CR4
-_x86_CR0:
-        resb 8
-_x86_CR1:
-        resb 8
-_x86_CR2:
-        resb 8
-_x86_CR3:
-        resb 8
-_x86_CR4:
-        resb 8

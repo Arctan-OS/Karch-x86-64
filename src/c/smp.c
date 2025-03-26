@@ -62,9 +62,9 @@ struct ap_start_info {
 	uint64_t stack_high;
 }__attribute__((packed));
 
-extern uint8_t __AP_START_BEGIN__;
-extern uint8_t __AP_START_END__;
-extern uint8_t __AP_START_INFO__;
+extern uint8_t _AP_START_BEGIN;
+extern uint8_t _AP_START_END;
+extern uint8_t _AP_START_INFO;
 
 struct ARC_ProcessorDescriptor Arc_ProcessorList[ARC_MAX_PROCESSORS] = { 0 };
 uint32_t Arc_ProcessorCounter = 0;
@@ -298,11 +298,10 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	pager_map(NULL, ARC_HHDM_TO_PHYS(stack), ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, 1 << ARC_PAGER_4K | 1 << ARC_PAGER_RW);
 
 	memset(code, 0, PAGE_SIZE);
-	memcpy(code, (void *)&__AP_START_BEGIN__, (size_t)((uintptr_t)&__AP_START_END__ - (uintptr_t)&__AP_START_BEGIN__));
-	struct ap_start_info *info = (struct ap_start_info *)((uintptr_t)code + ((uintptr_t)&__AP_START_INFO__ - (uintptr_t)&__AP_START_BEGIN__));
+	memcpy(code, (void *)&_AP_START_BEGIN, (size_t)((uintptr_t)&_AP_START_END - (uintptr_t)&_AP_START_BEGIN));
+	struct ap_start_info *info = (struct ap_start_info *)((uintptr_t)code + ((uintptr_t)&_AP_START_INFO - (uintptr_t)&_AP_START_BEGIN));
 
-	_x86_getCR3();
-	info->pml4 = _x86_CR3;
+	info->pml4 = _x86_getCR3();
 	info->entry = (uintptr_t)smp_move_ap_high_mem;
 	info->stack = ARC_HHDM_TO_PHYS(stack) + PAGE_SIZE - 0x8;
 	info->stack_high = (uintptr_t)stack_high + (PAGE_SIZE * 2) - 0x8;

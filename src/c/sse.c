@@ -52,19 +52,19 @@ int init_sse() {
 		return -1;
 	}
 
-	_x86_getCR0();
-	_x86_CR0 &= ~(1 << 2); // Disable x87 FPU emulation
-	_x86_CR0 |= (1 << 1); //
-	_x86_setCR0();
+	uint64_t cr0 = _x86_getCR0();
+	cr0 &= ~(1 << 2); // Disable x87 FPU emulation
+	cr0 |= (1 << 1); //
+	_x86_setCR0(cr0);
 
-	_x86_getCR4();
-	_x86_CR4 |= (1 << 9); // OSFXSR
-	_x86_CR4 |= (1 << 10); // OSXMMEXCPT
-	_x86_setCR4();
+	uint64_t cr4 = _x86_getCR4();
+	cr4 |= (1 << 9); // OSFXSR
+	cr4 |= (1 << 10); // OSXMMEXCPT
+	_x86_setCR4(cr4);
 
 	if (((ecx >> 27) & 1) == 1) {
-		_x86_CR4 |= (1 << 18); // OSXSAVE support
-		_x86_setCR4();
+		cr4 |= (1 << 18); // OSXSAVE support
+		_x86_setCR4(cr4);
 		void *fxsave_space = pmm_alloc_page();
 
 		if (fxsave_space == NULL) {

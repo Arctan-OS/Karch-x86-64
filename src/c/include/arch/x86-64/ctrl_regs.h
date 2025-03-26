@@ -29,26 +29,20 @@
 
 #include <stdint.h>
 
-extern uint64_t _x86_CR0;
-extern uint64_t _x86_CR1;
-extern uint64_t _x86_CR2;
-extern uint64_t _x86_CR3;
-extern uint64_t _x86_CR4;
+extern uint64_t _x86_getCR0();
+extern void _x86_setCR0(uint64_t val);
 
-extern void _x86_getCR0();
-extern void _x86_setCR0();
+extern uint64_t _x86_getCR1();
+extern void _x86_setCR1(uint64_t val);
 
-extern void _x86_getCR1();
-extern void _x86_setCR1();
+extern uint64_t _x86_getCR2();
+extern void _x86_setCR2(uint64_t val);
 
-extern void _x86_getCR2();
-extern void _x86_setCR2();
+extern uint64_t _x86_getCR3();
+extern void _x86_setCR3(uint64_t val);
 
-extern void _x86_getCR3();
-extern void _x86_setCR3();
-
-extern void _x86_getCR4();
-extern void _x86_setCR4();
+extern uint64_t _x86_getCR4();
+extern void _x86_setCR4(uint64_t val);
 
 // Returns in EDX:EAX
 extern uint64_t _x86_RDMSR(uint32_t msr);

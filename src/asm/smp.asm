@@ -28,21 +28,21 @@
 */
 %endif
 
-AP_PML4_OFF equ (__AP_START_INFO__.pml4 - __AP_START_BEGIN__)
-AP_ENTRY_OFF equ (__AP_START_INFO__.entry - __AP_START_BEGIN__)
-AP_FLAGS_OFF equ (__AP_START_INFO__.flags - __AP_START_BEGIN__)
-AP_GDTR_OFF equ (__AP_START_INFO__.gdtr - __AP_START_BEGIN__)
-AP_STACK_OFF equ (__AP_START_INFO__.stack - __AP_START_BEGIN__)
-AP_EDX_OFF equ (__AP_START_INFO__.edx - __AP_START_BEGIN__)
-AP_EAX_OFF equ (__AP_START_INFO__.eax - __AP_START_BEGIN__)
-AP_PAT_OFF equ (__AP_START_INFO__.pat - __AP_START_BEGIN__)
-AP_STACK_HIGH_OFF equ (__AP_START_INFO__.stack_high - __AP_START_BEGIN__)
+AP_PML4_OFF equ (_AP_START_INFO.pml4 - _AP_START_BEGIN)
+AP_ENTRY_OFF equ (_AP_START_INFO.entry - _AP_START_BEGIN)
+AP_FLAGS_OFF equ (_AP_START_INFO.flags - _AP_START_BEGIN)
+AP_GDTR_OFF equ (_AP_START_INFO.gdtr - _AP_START_BEGIN)
+AP_STACK_OFF equ (_AP_START_INFO.stack - _AP_START_BEGIN)
+AP_EDX_OFF equ (_AP_START_INFO.edx - _AP_START_BEGIN)
+AP_EAX_OFF equ (_AP_START_INFO.eax - _AP_START_BEGIN)
+AP_PAT_OFF equ (_AP_START_INFO.pat - _AP_START_BEGIN)
+AP_STACK_HIGH_OFF equ (_AP_START_INFO.stack_high - _AP_START_BEGIN)
 
 section .rodata
 
 bits 16
-global __AP_START_BEGIN__
-__AP_START_BEGIN__:
+global _AP_START_BEGIN
+_AP_START_BEGIN:
         cli
         cld
 
@@ -70,7 +70,7 @@ __AP_START_BEGIN__:
         ;; Far jump to PM
         shl ebx, 4
         mov ecx, ebx
-        add ebx, (pm - __AP_START_BEGIN__)
+        add ebx, (pm - _AP_START_BEGIN)
 
         ;; Enable protected mode
         mov eax, 0x11
@@ -111,7 +111,7 @@ pm:
         or eax, 1 << 31
         mov cr0, eax
 
-        lea eax, [ecx + (lm - __AP_START_BEGIN__)]
+        lea eax, [ecx + (lm - _AP_START_BEGIN)]
         push 0x18
         push eax
         retf
@@ -165,9 +165,9 @@ lm:
 
         jmp $
 
-global __AP_START_INFO__
+global _AP_START_INFO
 align 8
-__AP_START_INFO__:
+_AP_START_INFO:
         .pml4:
                 dq 0x0
         .entry:
@@ -193,5 +193,5 @@ __AP_START_INFO__:
         .stack_high:
                 dq 0x0
 
-global __AP_START_END__
-__AP_START_END__:
+global _AP_START_END
+_AP_START_END:
