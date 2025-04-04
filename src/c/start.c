@@ -25,27 +25,14 @@
  * @DESCRIPTION
 */
 #include <arch/start.h>
-#include <arch/acpi/acpi.h>
-#include <arch/pci/pci.h>
 #include <arch/smp.h>
-
-#include <arch/x86-64/gdt.h>
-#include <arch/x86-64/idt.h>
 #include <arch/x86-64/apic/apic.h>
-#include <arch/x86-64/sse.h>
+#include <global.h>
 
 int init_arch() {
-        if (init_acpi() != 0) {
-		return -1;
-	}
-
         if (init_apic() != 0) {
 		ARC_DEBUG(ERR, "Failed to initialize interrupts\n");
 		ARC_HANG;
-	}
-
-	if (init_pci() != 0) {
-		return -2;
 	}
 
 	return 0;

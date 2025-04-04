@@ -53,4 +53,11 @@ struct ARC_Registers {
 	uint64_t rflags;
 }__attribute__((packed));
 
+struct ARC_Context {
+	void *fxsave_space;
+	uint64_t cr0;
+	uint64_t cr4;
+	struct ARC_Registers regs;
+};
+
 #endif

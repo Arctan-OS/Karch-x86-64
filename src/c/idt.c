@@ -495,87 +495,111 @@ GENERIC_HANDLER(32) {
 
 	struct ARC_ProcessorDescriptor *processor = smp_get_proc_desc();
 
-	struct ARC_Registers *proc_regs = &processor->registers;
+	struct ARC_Context *proc_ctx = &processor->context;
 
 	pager_switch_to_kpages();
 
+	// DO:   This code needs to be reworked, as it does not adequately update
+	//       the context of threads when switched away. Is this "flags" thing
+	//       really needed also?
+
 	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXSAVE, 1) == 1) {
-		proc_regs->rax = regs->rax;
-		proc_regs->rbx = regs->rbx;
-		proc_regs->rcx = regs->rcx;
-		proc_regs->rdx = regs->rdx;
-		proc_regs->rsi = regs->rsi;
-		proc_regs->rdi = regs->rdi;
-		proc_regs->rsp = interrupt_frame->rsp;
-		proc_regs->rbp = regs->rbp;
-		proc_regs->rip = regs->rip;
-		proc_regs->r8 = regs->r8;
-		proc_regs->r9 = regs->r9;
-		proc_regs->r10 = regs->r10;
-		proc_regs->r11 = regs->r11;
-		proc_regs->r12 = regs->r12;
-		proc_regs->r13 = regs->r13;
-		proc_regs->r14 = regs->r14;
-		proc_regs->r15 = regs->r15;
-		proc_regs->cs = interrupt_frame->cs;
-		proc_regs->rip = interrupt_frame->rip;
-		proc_regs->rflags = interrupt_frame->rflags;
-		proc_regs->ss = interrupt_frame->ss;
+		proc_ctx->regs.rax = regs->rax;
+		proc_ctx->regs.rbx = regs->rbx;
+		proc_ctx->regs.rcx = regs->rcx;
+		proc_ctx->regs.rdx = regs->rdx;
+		proc_ctx->regs.rsi = regs->rsi;
+		proc_ctx->regs.rdi = regs->rdi;
+		proc_ctx->regs.rsp = interrupt_frame->rsp;
+		proc_ctx->regs.rbp = regs->rbp;
+		proc_ctx->regs.rip = regs->rip;
+		proc_ctx->regs.r8 = regs->r8;
+		proc_ctx->regs.r9 = regs->r9;
+		proc_ctx->regs.r10 = regs->r10;
+		proc_ctx->regs.r11 = regs->r11;
+		proc_ctx->regs.r12 = regs->r12;
+		proc_ctx->regs.r13 = regs->r13;
+		proc_ctx->regs.r14 = regs->r14;
+		proc_ctx->regs.r15 = regs->r15;
+		proc_ctx->regs.cs = interrupt_frame->cs;
+		proc_ctx->regs.rip = interrupt_frame->rip;
+		proc_ctx->regs.rflags = interrupt_frame->rflags;
+		proc_ctx->regs.ss = interrupt_frame->ss;
+		proc_ctx->cr0 = _x86_getCR0();
+		proc_ctx->cr4 = _x86_getCR4();
+
+		if (proc_ctx->fxsave_space != NULL) {
+			__asm__("fxsaveq [rax]" : : "a"(proc_ctx->fxsave_space) :);
+		}
 
 		processor->flags &= ~(1 << 1);
 	}
 
-	struct ARC_Registers *source = proc_regs;
+	struct ARC_Context *source = proc_ctx;
 
 	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXWRITE, 1) == 1) {
 	        ctx_switch:;
-		struct ARC_Registers saved = { 0 };
+		struct ARC_Context saved = { 0 };
 
-		saved.rax = regs->rax;
-		saved.rbx = regs->rbx;
-		saved.rcx = regs->rcx;
-		saved.rdx = regs->rdx;
-		saved.rsi = regs->rsi;
-		saved.rdi = regs->rdi;
-		saved.rsp = interrupt_frame->rsp;
-		saved.rbp = regs->rbp;
-		saved.rip = regs->rip;
-		saved.r8 = regs->r8;
-		saved.r9 = regs->r9;
-		saved.r10 = regs->r10;
-		saved.r11 = regs->r11;
-		saved.r12 = regs->r12;
-		saved.r13 = regs->r13;
-		saved.r14 = regs->r14;
-		saved.r15 = regs->r15;
-		saved.cs = interrupt_frame->cs;
-		saved.rip = interrupt_frame->rip;
-		saved.rflags = interrupt_frame->rflags;
-		saved.ss = interrupt_frame->ss;
+		saved.regs.rax = regs->rax;
+		saved.regs.rbx = regs->rbx;
+		saved.regs.rcx = regs->rcx;
+		saved.regs.rdx = regs->rdx;
+		saved.regs.rsi = regs->rsi;
+		saved.regs.rdi = regs->rdi;
+		saved.regs.rsp = interrupt_frame->rsp;
+		saved.regs.rbp = regs->rbp;
+		saved.regs.rip = regs->rip;
+		saved.regs.r8 = regs->r8;
+		saved.regs.r9 = regs->r9;
+		saved.regs.r10 = regs->r10;
+		saved.regs.r11 = regs->r11;
+		saved.regs.r12 = regs->r12;
+		saved.regs.r13 = regs->r13;
+		saved.regs.r14 = regs->r14;
+		saved.regs.r15 = regs->r15;
+		saved.regs.cs = interrupt_frame->cs;
+		saved.regs.rip = interrupt_frame->rip;
+		saved.regs.rflags = interrupt_frame->rflags;
+		saved.regs.ss = interrupt_frame->ss;
+		saved.cr0 = _x86_getCR0();
+		saved.cr4 = _x86_getCR4();
+		saved.fxsave_space = proc_ctx->fxsave_space;
+
+		if (proc_ctx->fxsave_space != NULL) {
+		 	__asm__("fxsaveq [rax]" : : "a"(proc_ctx->fxsave_space) :);
+		}
 
 		// Switch to desired context
-		regs->rax = source->rax;
-		regs->rbx = source->rbx;
-		regs->rcx = source->rcx;
-		regs->rdx = source->rdx;
-		regs->rsi = source->rsi;
-		regs->rdi = source->rdi;
-		interrupt_frame->rsp = source->rsp;
-		regs->rbp = source->rbp;
-		regs->rip = source->rip;
-		regs->r8 = source->r8;
-		regs->r9 = source->r9;
-		regs->r10 = source->r10;
-		regs->r11 = source->r11;
-		regs->r12 = source->r12;
-		regs->r13 = source->r13;
-		regs->r14 = source->r14;
-		regs->r15 = source->r15;
-		interrupt_frame->cs = source->cs;
-		interrupt_frame->rip = source->rip;
-		interrupt_frame->rflags = source->rflags;
-		interrupt_frame->ss = source->ss;
-		
+		regs->rax = source->regs.rax;
+		regs->rbx = source->regs.rbx;
+		regs->rcx = source->regs.rcx;
+		regs->rdx = source->regs.rdx;
+		regs->rsi = source->regs.rsi;
+		regs->rdi = source->regs.rdi;
+		interrupt_frame->rsp = source->regs.rsp;
+		regs->rbp = source->regs.rbp;
+		regs->rip = source->regs.rip;
+		regs->r8 = source->regs.r8;
+		regs->r9 = source->regs.r9;
+		regs->r10 = source->regs.r10;
+		regs->r11 = source->regs.r11;
+		regs->r12 = source->regs.r12;
+		regs->r13 = source->regs.r13;
+		regs->r14 = source->regs.r14;
+		regs->r15 = source->regs.r15;
+		interrupt_frame->cs = source->regs.cs;
+		interrupt_frame->rip = source->regs.rip;
+		interrupt_frame->rflags = source->regs.rflags;
+		interrupt_frame->ss = source->regs.ss;
+	
+		_x86_setCR0(source->cr0);
+		_x86_setCR4(source->cr4);
+
+		if (source->fxsave_space != NULL) {
+		 	__asm__("fxrstorq [rax]" : : "a"(source->fxsave_space) :);
+		}
+
 		smp_context_write(processor, &saved);
 		processor->flags &= ~1;
 	} else {
@@ -588,20 +612,26 @@ GENERIC_HANDLER(32) {
 
 		struct ARC_Thread *thread = sched_get_current_thread();
 
-		if (processor->last_thread != NULL) {
-			smp_context_save(processor, &processor->last_thread->ctx);
+		if (processor->current_thread == thread) {
+			goto skip_threading;
 		}
 
+		smp_context_save(processor, &processor->current_thread->context);
+
 		regs->cr3 = ARC_HHDM_TO_PHYS(processor->current_process->process->page_tables);
-		processor->last_thread = processor->current_thread;
 		processor->current_thread = thread;
-		source = &thread->ctx;
-		
+		source = &thread->context;
+
+		if (source->fxsave_space != NULL) {
+			printf("%d %p\n", processor_id, source->fxsave_space);
+			printf("%"PRIx64" %d\n", source->regs.rip, processor_id);
+		}
+
 		if (processor->last_thread != NULL) {
 			uint32_t expected = ARC_THREAD_RUNNING;
 			ARC_ATOMIC_CMPXCHG(&processor->last_thread->state, &expected, ARC_THREAD_READY);
 		}
-		
+
 		goto ctx_switch;
 	}
 

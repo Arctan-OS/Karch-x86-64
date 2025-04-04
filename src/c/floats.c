@@ -1,5 +1,5 @@
 /**
- * @file sse.c
+ * @file floats.c
  *
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
@@ -26,18 +26,20 @@
  * Called by CPUID to enable support for SSE.
 */
 
+#include "arch/x86-64/context.h"
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
-#include <arch/x86-64/sse.h>
+#include <arch/floats.h>
 #include <cpuid.h>
-#include <mm/pmm.h>
+#include <mm/allocator.h>
+#include <lib/util.h>
 
-/**
- * External assembly function to enable SSE.
- * */
-extern void _osxsave_support(uintptr_t fxsave_addr);
+// NOTE: It may be valuable to create a mechanism that utilizes xsave and xrstor
+//       instead of fxsave and fxrstor. This may become its own thing as xsave/rstor
+//       allow for the saving and restoring of many other bits of data other than just
+//       floating point data. For now though, fxsave/rstor are used.
 
-int init_sse() {
+static int init_sse(struct ARC_Context *context) {
 	register uint32_t eax;
 	register uint32_t ebx;
 	register uint32_t ecx;
@@ -45,16 +47,20 @@ int init_sse() {
 
 	__cpuid(0x01, eax, ebx, ecx, edx);
 
-        // Check for SSE2
-	if (((edx >> 25) & 1) == 0 && ((edx >> 26) & 1) == 0
-	    && (ecx & 1) == 0 && ((ecx >> 9) & 1) == 0) {
-		ARC_DEBUG(INFO, "No SSE/SSE2/SSE3/SSSE3 extensions\n");
+	if (((edx >> 24) & 1) == 0) {
+		ARC_DEBUG(ERR, "No fxsave/rstor instructions\n");
 		return -1;
+	}
+
+	if ((((edx >> 25) & 1) == 0 && ((edx >> 26) & 1) == 0
+	    && (ecx & 1) == 0 && ((ecx >> 9) & 1) == 0)) {
+		ARC_DEBUG(ERR, "No support for SSE\n");
+		return -2;
 	}
 
 	uint64_t cr0 = _x86_getCR0();
 	cr0 &= ~(1 << 2); // Disable x87 FPU emulation
-	cr0 |= (1 << 1); //
+	cr0 |= (1 << 1);
 	_x86_setCR0(cr0);
 
 	uint64_t cr4 = _x86_getCR4();
@@ -62,22 +68,24 @@ int init_sse() {
 	cr4 |= (1 << 10); // OSXMMEXCPT
 	_x86_setCR4(cr4);
 
-	if (((ecx >> 27) & 1) == 1) {
-		cr4 |= (1 << 18); // OSXSAVE support
-		_x86_setCR4(cr4);
-		void *fxsave_space = pmm_alloc_page();
-
-		if (fxsave_space == NULL) {
-			ARC_DEBUG(ERR, "Failed to a llocated FXSAVE space\n");
-			// Not sure what to do here, SSE is needed from here on
-			ARC_HANG;
-		}
-
-		_osxsave_support((uintptr_t)fxsave_space - 0x10);
+	void *fxsave_space = alloc(512);
+	
+	if (fxsave_space == NULL) {
+		ARC_DEBUG(ERR, "Failed to allocate fxsave space\n");
+		return -3;
 	}
 
-	// Set MXCSR Register
-	ARC_DEBUG(INFO, "Enabled SSE support\n");
+	memset(fxsave_space, 0, 512);
+	
+	context->fxsave_space = fxsave_space;
+	context->cr0 = cr0;
+	context->cr4 = cr4;
 
 	return 0;
+}
+
+int init_floats(struct ARC_Context *context, int flags) {
+	(void)flags;
+
+	return init_sse(context);
 }

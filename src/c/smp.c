@@ -26,6 +26,7 @@
  * This file implements functions for initializing and managing application processors
  * for symmetric multi-processing.
 */
+#include "arch/x86-64/context.h"
 #include <arch/x86-64/apic/lapic.h>
 #include <interface/printf.h>
 #include <global.h>
@@ -119,63 +120,68 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 }
 
 
-int smp_context_write(struct ARC_ProcessorDescriptor *processor, struct ARC_Registers *regs) {
-	if (processor == NULL || regs == NULL) {
+int smp_context_write(struct ARC_ProcessorDescriptor *processor, struct ARC_Context *ctx) {
+	if (processor == NULL || ctx == NULL) {
 		return 1;
 	}
 
-	processor->registers.rax = regs->rax;
-	processor->registers.rbx = regs->rbx;
-	processor->registers.rcx = regs->rcx;
-	processor->registers.rdx = regs->rdx;
-	processor->registers.rsi = regs->rsi;
-	processor->registers.rdi = regs->rdi;
-	processor->registers.rsp = regs->rsp;
-	processor->registers.rbp = regs->rbp;
-	processor->registers.r8 = regs->r8;
-	processor->registers.r9 = regs->r9;
-	processor->registers.r10 = regs->r10;
-	processor->registers.r11 = regs->r11;
-	processor->registers.r12 = regs->r12;
-	processor->registers.r13 = regs->r13;
-	processor->registers.r14 = regs->r14;
-	processor->registers.r15 = regs->r15;
-	processor->registers.cs = regs->cs;
-	processor->registers.rip = regs->rip;
-	processor->registers.rflags = regs->rflags;
-	processor->registers.ss = regs->ss;
-
+	processor->context.regs.rax =    ctx->regs.rax;
+	processor->context.regs.rbx =    ctx->regs.rbx;
+	processor->context.regs.rcx =    ctx->regs.rcx;
+	processor->context.regs.rdx =    ctx->regs.rdx;
+	processor->context.regs.rsi =    ctx->regs.rsi;
+	processor->context.regs.rdi =    ctx->regs.rdi;
+	processor->context.regs.rsp =    ctx->regs.rsp;
+	processor->context.regs.rbp =    ctx->regs.rbp;
+	processor->context.regs.r8 =     ctx->regs.r8;
+	processor->context.regs.r9 =     ctx->regs.r9;
+	processor->context.regs.r10 =    ctx->regs.r10;
+	processor->context.regs.r11 =    ctx->regs.r11;
+	processor->context.regs.r12 =    ctx->regs.r12;
+	processor->context.regs.r13 =    ctx->regs.r13;
+	processor->context.regs.r14 =    ctx->regs.r14;
+	processor->context.regs.r15 =    ctx->regs.r15;
+	processor->context.regs.cs =     ctx->regs.cs;
+	processor->context.regs.rip =    ctx->regs.rip;
+	processor->context.regs.rflags = ctx->regs.rflags;
+	processor->context.regs.ss =     ctx->regs.ss;
+	processor->context.cr0 =         ctx->cr0;
+	processor->context.cr4 =         ctx->cr4;
+	processor->context.fxsave_space = ctx->fxsave_space;
 	processor->flags |= 1 << ARC_SMP_FLAGS_CTXWRITE;
 
 	return 0;
 }
 
-int smp_context_save(struct ARC_ProcessorDescriptor *processor, struct ARC_Registers *regs) {
-	if (processor == NULL || regs == NULL) {
+int smp_context_save(struct ARC_ProcessorDescriptor *processor, struct ARC_Context *ctx) {
+	if (processor == NULL || ctx == NULL) {
 		return 1;
 	}
 
-	regs->rax = processor->registers.rax;
-	regs->rbx = processor->registers.rbx;
-	regs->rcx = processor->registers.rcx;
-	regs->rdx = processor->registers.rdx;
-	regs->rsi = processor->registers.rsi;
-	regs->rdi = processor->registers.rdi;
-	regs->rsp = processor->registers.rsp;
-	regs->rbp = processor->registers.rbp;
-	regs->rip = processor->registers.rip;
-	regs->r8 = processor->registers.r8;
-	regs->r9 = processor->registers.r9;
-	regs->r10 = processor->registers.r10;
-	regs->r11 = processor->registers.r11;
-	regs->r12 = processor->registers.r12;
-	regs->r13 = processor->registers.r13;
-	regs->r14 = processor->registers.r14;
-	regs->r15 = processor->registers.r15;
-	regs->cs = processor->registers.cs;
-	regs->rip = processor->registers.rip;
-	regs->rflags = processor->registers.rflags;
-	regs->ss = processor->registers.ss;
+	ctx->regs.rax =    processor->context.regs.rax;
+	ctx->regs.rbx =    processor->context.regs.rbx;
+	ctx->regs.rcx =    processor->context.regs.rcx;
+	ctx->regs.rdx =    processor->context.regs.rdx;
+	ctx->regs.rsi =    processor->context.regs.rsi;
+	ctx->regs.rdi =    processor->context.regs.rdi;
+	ctx->regs.rsp =    processor->context.regs.rsp;
+	ctx->regs.rbp =    processor->context.regs.rbp;
+	ctx->regs.rip =    processor->context.regs.rip;
+	ctx->regs.r8 =     processor->context.regs.r8;
+	ctx->regs.r9 =     processor->context.regs.r9;
+	ctx->regs.r10 =    processor->context.regs.r10;
+	ctx->regs.r11 =    processor->context.regs.r11;
+	ctx->regs.r12 =    processor->context.regs.r12;
+	ctx->regs.r13 =    processor->context.regs.r13;
+	ctx->regs.r14 =    processor->context.regs.r14;
+	ctx->regs.r15 =    processor->context.regs.r15;
+	ctx->regs.cs =     processor->context.regs.cs;
+	ctx->regs.rip =    processor->context.regs.rip;
+	ctx->regs.rflags = processor->context.regs.rflags;
+	ctx->regs.ss =     processor->context.regs.ss;
+	ctx->cr0 = processor->context.cr0;
+	ctx->cr4 = processor->context.cr4;
+	ctx->fxsave_space = processor->context.fxsave_space;
 
 	return 0;
 }
@@ -194,12 +200,12 @@ int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, i
 		uint64_t value = va_arg(list, uint64_t);
 
 		switch (i) {
-			case 0: { processor->registers.rdi = value; break; }
-			case 1: { processor->registers.rsi = value; break; }
-			case 2: { processor->registers.rdx = value; break; }
-			case 3: { processor->registers.rcx = value; break; }
-			case 4: { processor->registers.r8  = value; break; }
-			case 5: { processor->registers.r9  = value; break; }
+			case 0: { processor->context.regs.rdi = value; break; }
+			case 1: { processor->context.regs.rsi = value; break; }
+			case 2: { processor->context.regs.rdx = value; break; }
+			case 3: { processor->context.regs.rcx = value; break; }
+			case 4: { processor->context.regs.r8  = value; break; }
+			case 5: { processor->context.regs.r9  = value; break; }
 		}
 	}
 
@@ -211,10 +217,10 @@ int smp_sysv_set_args(struct ARC_ProcessorDescriptor *processor, va_list list, i
 
 	for (i = delta - 1; i >= 0; i--) {
 		uint64_t value = va_arg(list, uint64_t);
-		*(uint64_t *)(processor->registers.rsp - (i * 8)) = value;
+		*(uint64_t *)(processor->context.regs.rsp - (i * 8)) = value;
 	}
 
-	processor->registers.rsp -= delta * 8;
+	processor->context.regs.rsp -= delta * 8;
 
 	return 0;
 }
@@ -227,7 +233,7 @@ int smp_jmp(struct ARC_ProcessorDescriptor *processor, void *function, int argc,
 	smp_sysv_set_args(processor, args, argc);
 	va_end(args);
 
-	processor->registers.rip = (uintptr_t)function;
+	processor->context.regs.rip = (uintptr_t)function;
 
 	spinlock_unlock(&processor->register_lock);
 

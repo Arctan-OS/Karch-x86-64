@@ -40,6 +40,10 @@ _syscall:
 
         ;; Get stack
         ;; Unfortunately can't use rdgsbase rax
+
+        push r12
+        push r10
+
         push rcx
         push rdx
         push rax
@@ -82,5 +86,8 @@ _syscall:
         ;; Restore caller state except RSP
         POP_ALL
         pop rsp
+
+        pop r10
+        pop r12
 
         o64 sysret
