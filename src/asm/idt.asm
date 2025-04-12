@@ -52,11 +52,6 @@ _idt_stub_%1:
         mov ax, 0x10
         mov ss, ax
 
-        ;; Change page tables
-        lea r12, [rel Arc_KernelPageTables]
-        mov r12, [r12]
-        mov cr3, r12
-
         call generic_interrupt_handler_%1
 
         POP_ALL

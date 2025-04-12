@@ -45,20 +45,21 @@
 //       interrupt handler should not use printfs. The best way to resolve this is to
 //       make it so that printfs do not deadlock.
 
-#define GENERIC_HANDLER(__vector)					\
-	extern void _idt_stub_##__vector();				\
-	int generic_interrupt_handler_##__vector(struct ARC_Registers *regs)
+#define GENERIC_HANDLER(_vector)					\
+	extern void _idt_stub_##_vector();				\
+	int generic_interrupt_handler_##_vector(struct ARC_Registers *regs)
 
-#define GENERIC_HANDLER_PREAMBLE(__vector)				\
+#define GENERIC_HANDLER_PREAMBLE(_vector)				\
+	pager_switch_to_kpages();					\
 	int processor_id = lapic_get_id();				\
 	struct interrupt_frame *interrupt_frame = (struct interrupt_frame *)regs->rsp; \
 	(void)processor_id;						\
 	(void)interrupt_frame;
 
-#define GENERIC_EXCEPTION_PREAMBLE(__vector)				\
+#define GENERIC_EXCEPTION_PREAMBLE(_vector)				\
 	uint64_t interrupt_error_code = 0;				\
 	(void)interrupt_error_code;					\
-	switch (__vector) {						\
+	switch (_vector) {						\
 		case 8:							\
 		case 10:						\
 		case 11:						\
@@ -73,12 +74,12 @@
 		default:						\
 			break;						\
 	}								\
-	GENERIC_HANDLER_PREAMBLE(__vector)				\
+	GENERIC_HANDLER_PREAMBLE(_vector)				\
 
-#define GENERIC_EXCEPTION_REG_DUMP(__vector) \
+#define GENERIC_EXCEPTION_REG_DUMP(_vector) \
 	spinlock_lock(&panic_lock);					\
-	printf("Received Interrupt %d (%s) from LAPIC %d\n", __vector,	\
-	       exception_names[__vector], processor_id);		\
+	printf("Received Interrupt %d (%s) from LAPIC %d\n", _vector,	\
+	       exception_names[_vector], processor_id);		\
 	printf("RAX: 0x%016" PRIx64 "\n", regs->rax);			\
 	printf("RBX: 0x%016" PRIx64 "\n", regs->rbx);			\
 	printf("RCX: 0x%016" PRIx64 "\n", regs->rcx);			\
@@ -105,11 +106,11 @@
 							       8));	\
 	term_draw(&Arc_MainTerm);
 
-#define GENERIC_HANDLER_POSTAMBLE(__vector)	\
+#define GENERIC_HANDLER_POSTAMBLE(_vector)	\
 	lapic_eoi();
 
-#define GENERIC_HANDLER_INSTALL(__vector)	\
-	install_idt_gate(__vector, (uintptr_t)&_idt_stub_##__vector, 0x08, 0x8E);
+#define GENERIC_HANDLER_INSTALL(_vector)	\
+	install_idt_gate(_vector, (uintptr_t)&_idt_stub_##_vector, 0x08, 0x8E);
 
 
 
@@ -316,6 +317,7 @@ GENERIC_HANDLER(14) {
 	
 	uint64_t cr2 = _x86_getCR2();
 	if (interrupt_frame->cs == 0x08 && proc->current_process != NULL) {
+		//printf("Resolivng by cloning %"PRIx64"\n", cr2);
 		pager_clone(proc->current_process->process->page_tables, cr2, cr2, PAGE_SIZE, 0);
 	} else {
 		(void)interrupt_error_code;
@@ -495,163 +497,107 @@ GENERIC_HANDLER(32) {
 
 	struct ARC_ProcessorDescriptor *processor = smp_get_proc_desc();
 
-	struct ARC_Context *proc_ctx = &processor->context;
-
-	pager_switch_to_kpages();
-
-	// DO:   This code needs to be reworked, as it does not adequately update
-	//       the context of threads when switched away. Is this "flags" thing
-	//       really needed also?
-
-	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXSAVE, 1) == 1) {
-		proc_ctx->regs.rax = regs->rax;
-		proc_ctx->regs.rbx = regs->rbx;
-		proc_ctx->regs.rcx = regs->rcx;
-		proc_ctx->regs.rdx = regs->rdx;
-		proc_ctx->regs.rsi = regs->rsi;
-		proc_ctx->regs.rdi = regs->rdi;
-		proc_ctx->regs.rsp = interrupt_frame->rsp;
-		proc_ctx->regs.rbp = regs->rbp;
-		proc_ctx->regs.rip = regs->rip;
-		proc_ctx->regs.r8 = regs->r8;
-		proc_ctx->regs.r9 = regs->r9;
-		proc_ctx->regs.r10 = regs->r10;
-		proc_ctx->regs.r11 = regs->r11;
-		proc_ctx->regs.r12 = regs->r12;
-		proc_ctx->regs.r13 = regs->r13;
-		proc_ctx->regs.r14 = regs->r14;
-		proc_ctx->regs.r15 = regs->r15;
-		proc_ctx->regs.cs = interrupt_frame->cs;
-		proc_ctx->regs.rip = interrupt_frame->rip;
-		proc_ctx->regs.rflags = interrupt_frame->rflags;
-		proc_ctx->regs.ss = interrupt_frame->ss;
-		proc_ctx->cr0 = _x86_getCR0();
-		proc_ctx->cr4 = _x86_getCR4();
-
-		if (proc_ctx->fxsave_space != NULL) {
-			__asm__("fxsaveq [rax]" : : "a"(proc_ctx->fxsave_space) :);
-		}
-
-		processor->flags &= ~(1 << 1);
+	int r = sched_tick();
+	if (r == -2) {
+		goto skip_threading;
+	} else if (r == 1) {
+		lapic_ipi(32, 0, 0b11 << 18);
 	}
-
-	struct ARC_Context *source = proc_ctx;
-
-	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_CTXWRITE, 1) == 1) {
-	        ctx_switch:;
-		struct ARC_Context saved = { 0 };
-
-		saved.regs.rax = regs->rax;
-		saved.regs.rbx = regs->rbx;
-		saved.regs.rcx = regs->rcx;
-		saved.regs.rdx = regs->rdx;
-		saved.regs.rsi = regs->rsi;
-		saved.regs.rdi = regs->rdi;
-		saved.regs.rsp = interrupt_frame->rsp;
-		saved.regs.rbp = regs->rbp;
-		saved.regs.rip = regs->rip;
-		saved.regs.r8 = regs->r8;
-		saved.regs.r9 = regs->r9;
-		saved.regs.r10 = regs->r10;
-		saved.regs.r11 = regs->r11;
-		saved.regs.r12 = regs->r12;
-		saved.regs.r13 = regs->r13;
-		saved.regs.r14 = regs->r14;
-		saved.regs.r15 = regs->r15;
-		saved.regs.cs = interrupt_frame->cs;
-		saved.regs.rip = interrupt_frame->rip;
-		saved.regs.rflags = interrupt_frame->rflags;
-		saved.regs.ss = interrupt_frame->ss;
-		saved.cr0 = _x86_getCR0();
-		saved.cr4 = _x86_getCR4();
-		saved.fxsave_space = proc_ctx->fxsave_space;
-
-		if (proc_ctx->fxsave_space != NULL) {
-		 	__asm__("fxsaveq [rax]" : : "a"(proc_ctx->fxsave_space) :);
-		}
-
-		// Switch to desired context
-		regs->rax = source->regs.rax;
-		regs->rbx = source->regs.rbx;
-		regs->rcx = source->regs.rcx;
-		regs->rdx = source->regs.rdx;
-		regs->rsi = source->regs.rsi;
-		regs->rdi = source->regs.rdi;
-		interrupt_frame->rsp = source->regs.rsp;
-		regs->rbp = source->regs.rbp;
-		regs->rip = source->regs.rip;
-		regs->r8 = source->regs.r8;
-		regs->r9 = source->regs.r9;
-		regs->r10 = source->regs.r10;
-		regs->r11 = source->regs.r11;
-		regs->r12 = source->regs.r12;
-		regs->r13 = source->regs.r13;
-		regs->r14 = source->regs.r14;
-		regs->r15 = source->regs.r15;
-		interrupt_frame->cs = source->regs.cs;
-		interrupt_frame->rip = source->regs.rip;
-		interrupt_frame->rflags = source->regs.rflags;
-		interrupt_frame->ss = source->regs.ss;
 	
-		_x86_setCR0(source->cr0);
-		_x86_setCR4(source->cr4);
+	struct ARC_Thread *thread = sched_get_current_thread();
 
-		if (source->fxsave_space != NULL) {
-		 	__asm__("fxrstorq [rax]" : : "a"(source->fxsave_space) :);
-		}
+	if (processor->current_thread != thread) {		
+		if (processor->current_thread != NULL) {
+			// Save state to last thread
+			struct ARC_Thread *prev = processor->current_thread;
+			
+			prev->context.regs.rax = regs->rax;
+			prev->context.regs.rbx = regs->rbx;
+			prev->context.regs.rcx = regs->rcx;
+			prev->context.regs.rdx = regs->rdx;
+			prev->context.regs.rsi = regs->rsi;
+			prev->context.regs.rdi = regs->rdi;
+			prev->context.regs.rsp = interrupt_frame->rsp;
+			prev->context.regs.rbp = regs->rbp;
+			prev->context.regs.rip = regs->rip;
+			prev->context.regs.r8 = regs->r8;
+			prev->context.regs.r9 = regs->r9;
+			prev->context.regs.r10 = regs->r10;
+			prev->context.regs.r11 = regs->r11;
+			prev->context.regs.r12 = regs->r12;
+			prev->context.regs.r13 = regs->r13;
+			prev->context.regs.r14 = regs->r14;
+			prev->context.regs.r15 = regs->r15;
+			prev->context.regs.cs = interrupt_frame->cs;
+			prev->context.regs.rip = interrupt_frame->rip;
+			prev->context.regs.rflags = interrupt_frame->rflags;
+			prev->context.regs.ss = interrupt_frame->ss;
+			prev->context.cr0 = _x86_getCR0();
+			prev->context.cr4 = _x86_getCR4();
 
-		smp_context_write(processor, &saved);
-		processor->flags &= ~1;
-	} else {
-		int r = sched_tick();
-		if (r == -2) {
-			goto skip_threading;
-		} else if (r == 1) {
-			lapic_ipi(32, 0, 0b11 << 18);
-		}
+			if (prev->context.fxsave_space != NULL) {
+				__asm__("fxsaveq [rax]" : : "a"(prev->context.fxsave_space) :);
+			}
 
-		struct ARC_Thread *thread = sched_get_current_thread();
-
-		if (processor->current_thread == thread) {
-			goto skip_threading;
-		}
-
-		smp_context_save(processor, &processor->current_thread->context);
-
-		regs->cr3 = ARC_HHDM_TO_PHYS(processor->current_process->process->page_tables);
-		processor->current_thread = thread;
-		source = &thread->context;
-
-		if (source->fxsave_space != NULL) {
-			printf("%d %p\n", processor_id, source->fxsave_space);
-			printf("%"PRIx64" %d\n", source->regs.rip, processor_id);
-		}
-
-		if (processor->last_thread != NULL) {
 			uint32_t expected = ARC_THREAD_RUNNING;
-			ARC_ATOMIC_CMPXCHG(&processor->last_thread->state, &expected, ARC_THREAD_READY);
+			register uint32_t *state = &prev->state;
+			register uint32_t *exp = &expected;
+			ARC_ATOMIC_SFENCE;
+			ARC_ATOMIC_CMPXCHG(state, exp, ARC_THREAD_READY);
 		}
 
-		goto ctx_switch;
+		
+		processor->current_thread = thread;
+
+		regs->rax =               thread->context.regs.rax;
+		regs->rbx =               thread->context.regs.rbx;
+		regs->rcx =               thread->context.regs.rcx;
+		regs->rdx =               thread->context.regs.rdx;
+		regs->rsi =               thread->context.regs.rsi;
+		regs->rdi =               thread->context.regs.rdi;
+		interrupt_frame->rsp =    thread->context.regs.rsp;
+		regs->rbp =               thread->context.regs.rbp;
+		regs->rip =               thread->context.regs.rip;
+		regs->r8 =                thread->context.regs.r8;
+		regs->r9 =                thread->context.regs.r9;
+		regs->r10 =               thread->context.regs.r10;
+		regs->r11 =               thread->context.regs.r11;
+		regs->r12 =               thread->context.regs.r12;
+		regs->r13 =               thread->context.regs.r13;
+		regs->r14 =               thread->context.regs.r14;
+		regs->r15 =               thread->context.regs.r15;
+		regs->cr3 = 		  ARC_HHDM_TO_PHYS(processor->current_process->process->page_tables);
+		interrupt_frame->cs =     thread->context.regs.cs;
+		interrupt_frame->rip =    thread->context.regs.rip;
+		interrupt_frame->rflags = thread->context.regs.rflags;
+		interrupt_frame->ss =     thread->context.regs.ss;
+		_x86_WRMSR(0xC0000100, (uintptr_t)thread->tcb);
+
+		_x86_setCR0(thread->context.cr0);
+		_x86_setCR4(thread->context.cr4);
+
+		if (thread->context.fxsave_space != NULL) {
+		 	__asm__("fxrstorq [rax]" : : "a"(thread->context.fxsave_space) :);
+		}
 	}
 
 	skip_threading:;
 
-	spinlock_unlock(&processor->register_lock);
-
-	spinlock_lock(&processor->timer_lock);
-
 	if (processor->timer_mode == ARC_LAPIC_TIMER_ONESHOT) {
 		lapic_refresh_timer(processor->timer_ticks);
 	}
-	if (MASKED_READ(processor->flags, ARC_SMP_FLAGS_WTIMER, 1) == 1) {
+
+	ARC_ATOMIC_SFENCE;
+	register uint32_t flags = ARC_ATOMIC_LOAD(processor->flags);
+	while (MASKED_READ(flags, ARC_SMP_FLAGS_WTIMER, 1) == 1) {
+		flags &= ~(1 << 2);
+		ARC_ATOMIC_STORE(processor->flags, flags);
+	
 		lapic_setup_timer(32, processor->timer_mode);
 		lapic_refresh_timer(processor->timer_ticks);
-
-		processor->flags &= ~(1 << 2);
+		ARC_ATOMIC_SFENCE;
+		flags = ARC_ATOMIC_LOAD(processor->flags);
 	}
-
-	spinlock_unlock(&processor->timer_lock);
 
 	GENERIC_HANDLER_POSTAMBLE(32);
 

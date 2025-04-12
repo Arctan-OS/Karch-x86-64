@@ -36,6 +36,9 @@
 //       into it, the page will not be accessible by userspace as it is within
 //       a privelleged table.
 
+// BUG:  When the clone function is called with ARC_PAGER_OVW set, it will just fail.
+//       Find out if other functions do this too, or if it just this one and fix it.
+
 #define ADDRESS_MASK 0x000FFFFFFFFFF000
 // Flags for Arc_BootMeta->paging_features
 #define FLAGS_NO_EXEC (1 << 0)
@@ -143,15 +146,15 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 	int shift = ((level - 1) * 9) + 12;
 	int index = (virtual >> shift) & 0x1FF;
 	uint64_t entry = parent[index];
-
+	
 	uint64_t *address = (uint64_t *)ARC_PHYS_TO_HHDM(entry & 0x0000FFFFFFFFF000);
-
+	
 	bool present = entry & 1;
 	bool only_4k = (attributes >> ARC_PAGER_4K) & 1;
 	bool can_gib = (attributes >> ARC_PAGER_RESV0) & 1;
 	bool can_mib = (attributes >> ARC_PAGER_RESV1) & 1;
 	bool no_create = (attributes >> ARC_PAGER_RESV2) & 1;
-
+	
 	if (!present && (only_4k || (level == 4 && !can_gib) || (level == 3 && !can_mib) || level == 2) && !no_create && level != 1) {
 		// Only make a new table if:
 		//     The current entry is not present AND:
@@ -160,13 +163,13 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		//         - Can't make a MiB page, or
 		//         - Parent is a level 2 page table
 		//     AND creation of page tables is allowed
-
+		
 		address = (uint64_t *)pmm_alloc_page();
-
+		
 		if (address == NULL) {
 			return -1;
 		}
-
+		
 		memset(address, 0, PAGE_SIZE);
 		parent[index] = (uintptr_t)ARC_HHDM_TO_PHYS(address) | get_entry_bits(level, attributes);
 	}
@@ -434,7 +437,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	if (((pml3[info->pml3e] >> 7) & 1) == 1) {
-		if (table[index] != 0) {
+		if (table[index] != 0 && MASKED_READ(info->attributes, ARC_PAGER_OVW, 1) == 0) {
 			ARC_DEBUG(ERR, "Cannot overwrite\n");
 			return -2;
 		}
@@ -451,7 +454,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	if (((pml2[info->pml2e] >> 7) & 1) == 1) {
-		if (table[index] != 0) {
+		if (table[index] != 0 && MASKED_READ(info->attributes, ARC_PAGER_OVW, 1) == 0) {
 			ARC_DEBUG(ERR, "Cannot overwrite\n");
 			return -2;
 		}
@@ -466,7 +469,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 		return 0;
 	}
 
-	if (table[index] != 0) {
+	if (table[index] != 0 && MASKED_READ(info->attributes, ARC_PAGER_OVW, 1) == 0) {
 		ARC_DEBUG(ERR, "Cannot overwrite\n");
 		return -2;
 	}
