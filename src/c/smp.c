@@ -222,8 +222,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	// TODO: If BIST indicates error, shut down AP, move on
 	while ((info->flags & 1) == 0) __asm__("pause");
 
-	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE);
-	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE);
+	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE, NULL);
+	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, NULL);
 
 	pmm_low_free_page(code);
 	pmm_low_free_page(stack);

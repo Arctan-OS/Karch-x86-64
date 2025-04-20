@@ -312,7 +312,7 @@ static int pager_unmap_callback(struct pager_traverse_info *info, uint64_t *tabl
 	return 0;
 }
 
-uintptr_t pager_unmap(void *page_tables, uintptr_t virtual, size_t size) {
+int pager_unmap(void *page_tables, uintptr_t virtual, size_t size, void **physical) {
 	void *pml4 = (void *)ARC_PHYS_TO_HHDM(_x86_getCR3());
 	struct pager_traverse_info info = { .virtual = virtual, .physical = 0, .size = size, 
 					    .dest_table = page_tables == NULL ? pml4 : page_tables, .cur_table = pml4 };
@@ -322,7 +322,11 @@ uintptr_t pager_unmap(void *page_tables, uintptr_t virtual, size_t size) {
 		return -1;
 	}
 
-	return info.physical;
+	if (physical != NULL) {
+		*physical = (void *)info.physical;
+	}
+
+	return 0;
 }
 
 static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {

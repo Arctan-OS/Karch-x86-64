@@ -37,7 +37,7 @@ extern Arc_SyscallTable
 extern Arc_KernelPageTables
 _syscall:
         cli
-
+        
         ;; Get stack
         ;; Unfortunately can't use rdgsbase rax
 

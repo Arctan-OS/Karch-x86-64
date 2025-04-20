@@ -317,7 +317,6 @@ GENERIC_HANDLER(14) {
 	
 	uint64_t cr2 = _x86_getCR2();
 	if (interrupt_frame->cs == 0x08 && proc->current_process != NULL) {
-		//printf("Resolivng by cloning %"PRIx64"\n", cr2);
 		pager_clone(proc->current_process->process->page_tables, cr2, cr2, PAGE_SIZE, 0);
 	} else {
 		(void)interrupt_error_code;
