@@ -27,6 +27,7 @@
 #ifndef ARC_ARCH_X86_64_UTIL_H
 #define ARC_ARCH_X86_64_UTIL_H
 
+#define ARC_HALT __asm__("hlt");
 #define ARC_HANG __asm__("1: hlt; jmp 1b");
 #define ARC_DISABLE_INTERRUPT __asm__("cli");
 #define ARC_ENABLE_INTERRUPT __asm__("sti");

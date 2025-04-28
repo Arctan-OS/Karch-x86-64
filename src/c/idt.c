@@ -101,10 +101,10 @@
 	printf("Return address: 0x%"PRIx64":0x%016"PRIx64"\n", interrupt_frame->cs, \
 	       interrupt_frame->rip);					\
 	printf("Error code: 0x%"PRIx64"\n", interrupt_error_code);	\
-	memset(Arc_MainTerm.framebuffer, 0,				\
-	       Arc_MainTerm.fb_width *Arc_MainTerm.fb_height *(Arc_MainTerm.fb_bpp / \
-							       8));	\
-	term_draw(&Arc_MainTerm);
+	memset(Arc_CurrentTerm->framebuffer, 0,				\
+		Arc_CurrentTerm->fb_width * Arc_CurrentTerm->fb_height  \
+		* (Arc_CurrentTerm->fb_bpp / 8));			\
+	term_draw(Arc_CurrentTerm);
 
 #define GENERIC_HANDLER_POSTAMBLE(_vector)	\
 	lapic_eoi();

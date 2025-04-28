@@ -26,6 +26,8 @@
  * This file implements functions for initializing and managing application processors
  * for symmetric multi-processing.
 */
+#include "arch/x86-64/util.h"
+#include "interface/terminal.h"
 #include <arch/x86-64/apic/lapic.h>
 #include <interface/printf.h>
 #include <global.h>
@@ -72,7 +74,7 @@ struct ARC_ProcessorDescriptor *Arc_BootProcessor = NULL;
 
 static uint32_t last_lapic = 0;
 
-void __attribute__((naked)) smp_hold() {
+void smp_hold() {
 	ARC_HANG;
 }
 
@@ -130,6 +132,14 @@ struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
 
 uint32_t smp_get_processor_id() {
 	return lapic_get_id();
+}
+
+int smp_set_tcb(void *tcb) {
+	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
+	desc->current_thread->tcb = tcb;
+	_x86_WRMSR(0xC0000100, (uintptr_t)tcb);
+
+	return 0;
 }
 
 int smp_switch_to_userspace() {
