@@ -111,7 +111,7 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 
 	Arc_ProcessorList[id].flags |= 1 << ARC_SMP_FLAGS_INIT;
 
-	__asm__("sti");
+	ARC_ENABLE_INTERRUPT;
 
 	info->flags |= 1;
 
@@ -147,6 +147,8 @@ int smp_switch_to_userspace() {
 	//       interrupt can do this work by setting the return SS and CS to be of ones
 	//       that have a privelege level of 3. This function is kept as a way for the
 	//       kernel to explicitly state that all processors are to be switched to userspace
+	ARC_ENABLE_INTERRUPT;
+
 	return 0;
 }
 
