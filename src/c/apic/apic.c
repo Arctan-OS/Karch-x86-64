@@ -37,6 +37,7 @@
 #include <arch/x86-64/gdt.h>
 #include <arch/x86-64/idt.h>
 #include <arch/smp.h>
+#include <arch/io/port.h>
 
 #define ENTRY_TYPE_LAPIC               0x00
 #define ENTRY_TYPE_IOAPIC              0x01
@@ -182,11 +183,6 @@ int init_apic() {
 				uint8_t trigger = ((flags >> 2) & 0b11) == 0b11 ? 0x1 : 0x0; // 01: Edge; 11: Level
 
 				ARC_DEBUG(INFO, "Interrupt Source Override found (IRQ: %d, GSI: %d, %s, %s)\n", irq, gsi, polarity ? "Active Low" : "Active High", trigger ? "Level Sensitive" : "Edge Sensitive");
-
-				if (irq != 0) {
-					// The LAPIC timer will be used
-	//				apic_map_gsi_irq(gsi, irq, bsp, (trigger | (polarity << 1)));
-				}
 
 				break;
 			}
