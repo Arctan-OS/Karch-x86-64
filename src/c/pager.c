@@ -4,10 +4,10 @@
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
  * @LICENSE
- * Arctan - Operating System Kernel
+ * Arctan-OS/Kernel - Operating System Kernel
  * Copyright (C) 2023-2025 awewsomegamer
  *
- * This file is part of Arctan.
+ * This file is part of Arctan-OS/Kernel.
  *
  * Arctan is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -125,7 +125,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	bits |= (((attributes >> ARC_PAGER_RW) & 1) | us_rw_overwrite) << 1;
 	bits |= 1; // Present
 
-	if ((Arc_BootMeta->paging_features & FLAGS_NO_EXEC) == 1) {
+	if ((Arc_KernelMeta->paging_features & FLAGS_NO_EXEC) == 1) {
 		bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & 1) << 63;
 	}
 

@@ -4,10 +4,10 @@
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
  * @LICENSE
- * Arctan - Operating System Kernel
+ * Arctan-OS/Kernel - Operating System Kernel
  * Copyright (C) 2023-2025 awewsomegamer
  *
- * This file is part of Arctan.
+ * This file is part of Arctan-OS/Kernel.
  *
  * Arctan is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -202,7 +202,7 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	info->gdt_addr = ARC_HHDM_TO_PHYS(&info->gdt_table);
 	info->pat = _x86_RDMSR(0x277);
 	info->flags |= (1 << 2);
-	info->flags |= ((Arc_BootMeta->paging_features & 1) << 3);
+	info->flags |= ((Arc_KernelMeta->paging_features & 1) << 3);
 
 	ARC_MEM_BARRIER;
 
