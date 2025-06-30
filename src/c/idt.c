@@ -101,18 +101,14 @@
 	printf("Return address: 0x%"PRIx64":0x%016"PRIx64"\n", interrupt_frame->cs, \
 	       interrupt_frame->rip);					\
 	printf("Error code: 0x%"PRIx64"\n", interrupt_error_code);	\
-	memset(Arc_CurrentTerm->framebuffer, 0,				\
-		Arc_CurrentTerm->fb_width * Arc_CurrentTerm->fb_height  \
-		* (Arc_CurrentTerm->fb_bpp / 8));			\
-	term_draw(Arc_CurrentTerm);
+	term_draw();							\
+	spinlock_unlock(&panic_lock);				
 
 #define GENERIC_HANDLER_POSTAMBLE(_vector)	\
 	lapic_eoi();
 
 #define GENERIC_HANDLER_INSTALL(_vector)	\
 	install_idt_gate(_vector, (uintptr_t)&_idt_stub_##_vector, 0x08, 0x8E);
-
-
 
 static const char *exception_names[] = {
 	"Division Error (#DE)",
