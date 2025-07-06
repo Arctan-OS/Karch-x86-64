@@ -164,7 +164,7 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		//         - Parent is a level 2 page table
 		//     AND creation of page tables is allowed
 		
-		address = (uint64_t *)pmm_alloc_page();
+		address = (uint64_t *)pmm_fast_page_alloc();
 		
 		if (address == NULL) {
 			return -1;
@@ -254,7 +254,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 }
 
 void *pager_create_page_tables() {
-	void *tables = pmm_alloc_page();
+	void *tables = pmm_fast_page_alloc();
 
 	if (tables == NULL) {
 		return NULL;
@@ -335,7 +335,7 @@ static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *ta
 		return -1;
 	}
 
-	void *page = pmm_alloc_page();
+	void *page = pmm_fast_page_alloc();
 
 	if (page == NULL) {
 		ARC_DEBUG(ERR, "Failed to allocate a page\n");
@@ -371,7 +371,7 @@ static int pager_fly_unmap_callback(struct pager_traverse_info *info, uint64_t *
 		return -1;
 	}
 
-	pmm_free_page((void *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK));
+	pmm_fast_page_free((void *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK));
 	table[index] = 0;
 
 	if (info->dest_table == info->cur_table) {

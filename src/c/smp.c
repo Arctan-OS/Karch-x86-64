@@ -162,7 +162,7 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	if (processor == (uint32_t)lapic_get_id()) {
 		// BSP
 		Arc_ProcessorList[processor].syscall_stack = init_gdt(processor);
-		init_idt();
+		init_idt(0x8);
 		init_syscall();
 
 		Arc_BootProcessor = &Arc_ProcessorList[processor];
@@ -181,8 +181,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	// Allocate space in low memory, copy ap_start code to it
 	// which should bring AP to kernel_main where it will be
 	// detected, logged, and put into smp_hold
-	void *code = pmm_low_alloc_page();
-	void *stack = pmm_low_alloc_page();
+	void *code = pmm_low_page_alloc();
+	void *stack = pmm_low_page_alloc();
 
 	// NOTE: This is a virtual address
 	void *stack_high = alloc(PAGE_SIZE * 2);
@@ -237,8 +237,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE, NULL);
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, NULL);
 
-	pmm_low_free_page(code);
-	pmm_low_free_page(stack);
+	pmm_low_page_free(code);
+	pmm_low_page_free(stack);
 
 	Arc_ProcessorCounter++;
 
