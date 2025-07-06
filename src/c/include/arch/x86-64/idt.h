@@ -47,8 +47,11 @@ extern void _install_idt();
  * @parma uint16_t segment - The segment in which the handler function is located.
  * @param uint8_t attrs - The attributes of the interrupt.
  * */
-void install_idt_gate(int i, uint64_t offset, uint16_t segment, uint8_t attrs);
+void install_idt_gate(int i, uint64_t offset, uint16_t segment, uint8_t attrs, int ist);
 
+void idt_install_exceptions(int kcode_seg, int ist);
+
+void idt_install_irqs(int kcode_seg, int ist);
 
 /**
  * Initialize the IDT.

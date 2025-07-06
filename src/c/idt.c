@@ -107,8 +107,8 @@
 #define GENERIC_HANDLER_POSTAMBLE(_vector)	\
 	lapic_eoi();
 
-#define GENERIC_HANDLER_INSTALL(_vector)	\
-	install_idt_gate(_vector, (uintptr_t)&_idt_stub_##_vector, 0x08, 0x8E);
+#define GENERIC_HANDLER_INSTALL(_vector, _segment, _ist)	\
+	install_idt_gate(_vector, (uintptr_t)&_idt_stub_##_vector, _segment, 0x8E, _ist);
 
 static const char *exception_names[] = {
 	"Division Error (#DE)",
@@ -707,72 +707,75 @@ GENERIC_HANDLER(50) {
 	return 0;
 }
 
-void install_idt_gate(int i, uint64_t offset, uint16_t segment, uint8_t attrs) {
+void install_idt_gate(int i, uint64_t offset, uint16_t segment, uint8_t attrs, int ist) {
 	idt_entries[i].offset1 = offset & 0xFFFF;
 	idt_entries[i].offset2 = (offset >> 16) & 0xFFFF;
 	idt_entries[i].offset3 = (offset >> 32) & 0xFFFFFFFF;
+
 	idt_entries[i].segment = segment;
 	idt_entries[i].attrs = attrs;
-	idt_entries[i].ist = 1;
+	idt_entries[i].ist = ist;
 	idt_entries[i].reserved = 0;
 }
 
-void init_idt() {
-	// Exception
-	GENERIC_HANDLER_INSTALL(0);
-	GENERIC_HANDLER_INSTALL(1);
-	GENERIC_HANDLER_INSTALL(2);
-	GENERIC_HANDLER_INSTALL(3);
-	GENERIC_HANDLER_INSTALL(4);
-	GENERIC_HANDLER_INSTALL(5);
-	GENERIC_HANDLER_INSTALL(6);
-	GENERIC_HANDLER_INSTALL(7);
-	GENERIC_HANDLER_INSTALL(8);
-	GENERIC_HANDLER_INSTALL(9);
-	GENERIC_HANDLER_INSTALL(10);
-	GENERIC_HANDLER_INSTALL(11);
-	GENERIC_HANDLER_INSTALL(12);
-	GENERIC_HANDLER_INSTALL(13);
-	GENERIC_HANDLER_INSTALL(14);
-	GENERIC_HANDLER_INSTALL(15);
-	GENERIC_HANDLER_INSTALL(16);
-	GENERIC_HANDLER_INSTALL(17);
-	GENERIC_HANDLER_INSTALL(18);
-	GENERIC_HANDLER_INSTALL(19);
-	GENERIC_HANDLER_INSTALL(20);
-	GENERIC_HANDLER_INSTALL(21);
-	GENERIC_HANDLER_INSTALL(22);
-	GENERIC_HANDLER_INSTALL(23);
-	GENERIC_HANDLER_INSTALL(24);
-	GENERIC_HANDLER_INSTALL(25);
-	GENERIC_HANDLER_INSTALL(26);
-	GENERIC_HANDLER_INSTALL(27);
-	GENERIC_HANDLER_INSTALL(28);
-	GENERIC_HANDLER_INSTALL(29);
-	GENERIC_HANDLER_INSTALL(30);
-	GENERIC_HANDLER_INSTALL(31);
+void idt_install_exceptions(int kcode_seg, int ist) {
+	GENERIC_HANDLER_INSTALL(0, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(1, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(2, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(3, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(4, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(5, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(6, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(7, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(8, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(9, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(10, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(11, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(12, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(13, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(14, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(15, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(16, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(17, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(18, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(19, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(20, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(21, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(22, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(23, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(24, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(25, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(26, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(27, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(28, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(29, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(30, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(31, kcode_seg, ist);
+}
 
-	// IRQ
-	GENERIC_HANDLER_INSTALL(32);
-	GENERIC_HANDLER_INSTALL(33);
-	GENERIC_HANDLER_INSTALL(34);
-	GENERIC_HANDLER_INSTALL(35);
-	GENERIC_HANDLER_INSTALL(36);
-	GENERIC_HANDLER_INSTALL(37);
-	GENERIC_HANDLER_INSTALL(38);
-	GENERIC_HANDLER_INSTALL(39);
-	GENERIC_HANDLER_INSTALL(40);
-	GENERIC_HANDLER_INSTALL(41);
-	GENERIC_HANDLER_INSTALL(42);
-	GENERIC_HANDLER_INSTALL(43);
-	GENERIC_HANDLER_INSTALL(44);
-	GENERIC_HANDLER_INSTALL(45);
-	GENERIC_HANDLER_INSTALL(46);
-	GENERIC_HANDLER_INSTALL(47);
-	GENERIC_HANDLER_INSTALL(48);
-	GENERIC_HANDLER_INSTALL(49);
-	GENERIC_HANDLER_INSTALL(50);
-	
+void idt_install_irqs(int kcode_seg, int ist) {
+	GENERIC_HANDLER_INSTALL(32, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(33, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(34, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(35, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(36, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(37, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(38, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(39, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(40, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(41, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(42, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(43, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(44, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(45, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(46, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(47, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(48, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(49, kcode_seg, ist);
+	GENERIC_HANDLER_INSTALL(50, kcode_seg, ist);
+}
+
+void init_idt() {
 	idtr.limit = sizeof(idt_entries) * 16 - 1;
 	idtr.base = (uintptr_t)&idt_entries;
 

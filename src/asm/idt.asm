@@ -31,10 +31,9 @@ bits 64
 global _install_idt
 extern idtr
 _install_idt:
-        push rax
         lea rax, [rel idtr]
         lidt [rax]
-        pop rax
+        xor rax, rax
         ret
 
 %include "src/asm/context.asm"

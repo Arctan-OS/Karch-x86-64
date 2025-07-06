@@ -27,7 +27,16 @@
 #include <arch/start.h>
 #include <arch/smp.h>
 #include <arch/x86-64/apic/apic.h>
+#include <arch/x86-64/idt.h>
+#include <arch/pager.h>
 #include <global.h>
+
+int init_arch_early() {
+	idt_install_exceptions(0x18, 0);
+	init_idt();
+
+	return 0;
+}
 
 int init_arch() {
         if (init_apic() != 0) {
