@@ -36,20 +36,30 @@
 // SMALLEST_PAGE_SIZE_EXPONENT should not be included
 // in the list below as those are handled in a separate
 // freelist with less overhead
-
 // A list of exponents to dictate block size and the order
 // in which they should be tried (priority). The priority
 // descends from left to right
 #define PMM_BIAS_ARRAY 30,21
-
-// These are the coefficients to the block size. Dictating
-// the minimum number of blocks that must fit into a region
-// for that region to be converted to a freelist of those
-// blocks
-#define PMM_BIAS_COEFF 4,12
-// The number of elements in the array and the number of
-// coefficients
+// The number of elements in the bias array
 #define PMM_BIAS_COUNT 2
+#endif
+
+#ifndef PMM_BIAS_LOW
+// These are the minimum nuber of each block size
+// listed above that must fit into a region
+#define PMM_BIAS_LOW 4,12
+#endif
+
+#ifndef PMM_BIAS_RATIO
+// These are the maximum nuber of each block size
+// listed above that are to be initialized
+//
+// Values == 0 will be processed last
+#define PMM_BIAS_RATIO 2,0
+#define PMM_BIAS_DENOMINATOR 3
+
+// PMM_BIAS_RATIO[i] / PMM_BIAS_DENOMINATOR
+
 #endif
 
 #endif
