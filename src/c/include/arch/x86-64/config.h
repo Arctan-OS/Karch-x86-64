@@ -40,8 +40,6 @@
 // in which they should be tried (priority). The priority
 // descends from left to right
 #define PMM_BIAS_ARRAY 30,21
-// The number of elements in the bias array
-#define PMM_BIAS_COUNT 2
 #endif
 
 #ifndef PMM_BIAS_LOW
