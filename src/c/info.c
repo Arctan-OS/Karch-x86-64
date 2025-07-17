@@ -49,3 +49,7 @@ uint32_t arch_virtual_address_width() {
 
         return MASKED_READ(eax, 8, 0xFF);
 }
+
+__attribute__((naked)) uint64_t arch_get_cycles() {
+	__asm__("rdtsc; shl rdx, 32; or rdx, rax; mov rax, rdx; ret" :::);
+}

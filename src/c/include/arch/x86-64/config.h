@@ -29,8 +29,8 @@
 
 #include <stddef.h>
 
-#define SMALLEST_PAGE_SIZE_EXPONENT 12
-#define PAGE_SIZE (size_t)(1 << SMALLEST_PAGE_SIZE_EXPONENT)
+#define PAGE_SIZE_LOWEST_EXPONENT 12
+#define PAGE_SIZE (size_t)(1 << PAGE_SIZE_LOWEST_EXPONENT)
 
 #ifndef PMM_BIAS_ARRAY
 // SMALLEST_PAGE_SIZE_EXPONENT should not be included
@@ -53,17 +53,17 @@
 // listed above that are to be initialized
 //
 // Values == 0 will be processed last
-#define PMM_BIAS_RATIO 2,0
+#define PMM_BIAS_RATIO 2,1
 #define PMM_BIAS_DENOMINATOR 3
 
 // PMM_BIAS_RATIO[i] / PMM_BIAS_DENOMINATOR
 
 #endif
 
-#ifndef PMM_LOWEST_BUDDY_EXPONENT
-#define PMM_LOWEST_BUDDY_EXPONENT SMALLEST_PAGE_SIZE_EXPONENT
+#ifndef PMM_BUDDY_LOWEST_EXPONENT
+#define PMM_BUDDY_LOWEST_EXPONENT PAGE_SIZE_LOWEST_EXPONENT
 #endif
 
-#define PMM_LOWEST_BUDDY_SIZE (1 << PMM_LOWEST_BUDDY_EXPONENT)
+#define PMM_BUDDY_LOWEST_SIZE (1 << PMM_BUDDY_LOWEST_EXPONENT)
 
 #endif
