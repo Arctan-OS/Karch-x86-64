@@ -28,42 +28,30 @@
 #define ARC_ARCH_X86_64_CONFIG_H
 
 #include <stddef.h>
+#include <arctan.h>
 
 #define PAGE_SIZE_LOWEST_EXPONENT 12
 #define PAGE_SIZE (size_t)(1 << PAGE_SIZE_LOWEST_EXPONENT)
 
-#ifndef PMM_BIAS_ARRAY
-// SMALLEST_PAGE_SIZE_EXPONENT should not be included
-// in the list below as those are handled in a separate
-// freelist with less overhead
-// A list of exponents to dictate block size and the order
-// in which they should be tried (priority). The priority
-// descends from left to right
-#define PMM_BIAS_ARRAY 30,21
+#ifndef ARC_PMM_BIASES_DEFINED
+#define ARC_PMM_BIASES_DEFINED
+
+static const struct ARC_PMMBiasConfigElement pmm_biases[] = {
+        {
+                .exp = 30,
+                .min_blocks = 4,
+                .min_buddy_exp = PAGE_SIZE_LOWEST_EXPONENT,
+                .ratio.numerator = 2,
+                .ratio.denominator = 3,
+        },
+        {
+                .exp = 21,
+                .min_blocks = 12,
+                .min_buddy_exp = PAGE_SIZE_LOWEST_EXPONENT,
+                .ratio.numerator = 2,
+                .ratio.denominator = 3,
+        },
+};
 #endif
-
-#ifndef PMM_BIAS_LOW
-// These are the minimum nuber of each block size
-// listed above that must fit into a region
-#define PMM_BIAS_LOW 4,12
-#endif
-
-#ifndef PMM_BIAS_RATIO
-// These are the maximum nuber of each block size
-// listed above that are to be initialized
-//
-// Values == 0 will be processed last
-#define PMM_BIAS_RATIO 2,1
-#define PMM_BIAS_DENOMINATOR 3
-
-// PMM_BIAS_RATIO[i] / PMM_BIAS_DENOMINATOR
-
-#endif
-
-#ifndef PMM_BUDDY_LOWEST_EXPONENT
-#define PMM_BUDDY_LOWEST_EXPONENT PAGE_SIZE_LOWEST_EXPONENT
-#endif
-
-#define PMM_BUDDY_LOWEST_SIZE (1 << PMM_BUDDY_LOWEST_EXPONENT)
 
 #endif
