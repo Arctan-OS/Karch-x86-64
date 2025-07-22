@@ -181,8 +181,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	// Allocate space in low memory, copy ap_start code to it
 	// which should bring AP to kernel_main where it will be
 	// detected, logged, and put into smp_hold
-	void *code = pmm_low_page_alloc();
-	void *stack = pmm_low_page_alloc();
+	void *code = pmm_fast_page_alloc_low();
+	void *stack = pmm_fast_page_alloc_low();
 
 	// NOTE: This is a virtual address
 	void *stack_high = alloc(PAGE_SIZE * 2);
@@ -237,8 +237,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE, NULL);
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, NULL);
 
-	pmm_low_page_free(code);
-	pmm_low_page_free(stack);
+	pmm_fast_page_free(code);
+	pmm_fast_page_free(stack);
 
 	Arc_ProcessorCounter++;
 
