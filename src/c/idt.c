@@ -101,8 +101,7 @@
 	printf("Return address: 0x%"PRIx64":0x%016"PRIx64"\n", interrupt_frame->cs, \
 	       interrupt_frame->rip);					\
 	printf("Error code: 0x%"PRIx64"\n", interrupt_error_code);	\
-	term_draw();							\
-	spinlock_unlock(&panic_lock);				
+
 
 #define GENERIC_HANDLER_POSTAMBLE(_vector)	\
 	lapic_eoi();
