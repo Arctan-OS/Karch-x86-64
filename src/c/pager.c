@@ -74,7 +74,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	// Level 4: PML4
 
 	uint64_t bits = 0;
-	
+
 	bits |= ((attributes >> (ARC_PAGER_PAT)) & 1) << 2; // PWT
 	bits |= ((attributes >> (ARC_PAGER_PAT + 1)) & 1) << 3; // PCD
 
@@ -94,7 +94,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 			// 2MiB pages unless 4K specified
 			if (((attributes >> ARC_PAGER_RESV1) & 1) == 1) {
 				us_rw_overwrite = 0;
-				bits |= (!((attributes >> (ARC_PAGER_4K)) & 1)) << 7;
+				bits |= 1 << 7;
 			}
 
 			break;
@@ -106,7 +106,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 			// 1GiB pages unless 4K specified
  			if (((attributes >> ARC_PAGER_RESV0) & 1) == 1) {
 				us_rw_overwrite = 0;
-				bits |= (!((attributes >> (ARC_PAGER_4K)) & 1)) << 7;
+				bits |= 1 << 7;
 			}
 
 			break;
@@ -123,11 +123,8 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	//       to looking things up
 	bits |= (((attributes >> ARC_PAGER_US) & 1) | us_rw_overwrite) << 2;
 	bits |= (((attributes >> ARC_PAGER_RW) & 1) | us_rw_overwrite) << 1;
+	bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & ((Arc_KernelMeta->paging_features >> ARC_PAGER_FLAG_NO_EXEC) & 1)) << 63;
 	bits |= 1; // Present
-
-	if ((Arc_KernelMeta->paging_features & FLAGS_NO_EXEC) == 1) {
-		bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & 1) << 63;
-	}
 
 	return bits;
 }
@@ -143,19 +140,35 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
  * @return a non-NULL pointer to the next page table
  * */
 static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32_t attributes) {
+	if (parent == NULL) {
+		ARC_DEBUG(ERR, "NULL parent\n");
+		return -1;
+	}
+
 	int shift = ((level - 1) * 9) + 12;
 	int index = (virtual >> shift) & 0x1FF;
 	uint64_t entry = parent[index];
-	
-	uint64_t *address = (uint64_t *)ARC_PHYS_TO_HHDM(entry & 0x0000FFFFFFFFF000);
-	
+
+	uint64_t *address = (uint64_t *)(entry & 0x0000FFFFFFFFF000);
+
+	/*
+		Level | Decsription
+		4     | Parent: PML4, Entry: "PML4E" (no large pages here, always create new PML3)
+		3     | Parent: PML3, Entry: PDPTE, "PML3E" (1 GiB page entries possible here)
+		2     | Parent: PML2, Entry: PDE, "PML2E" (2 MiB page entries possible here)
+		1     | Parent: PML1, Entry: PTE, "PML1E" (regular 4 KiB page entries here)
+		0     | Page (can't really do anything with this level here)
+
+		In the event that ARC_PAGER_4K is set, always create new lower page tables
+	*/
+
 	bool present = entry & 1;
-	bool only_4k = (attributes >> ARC_PAGER_4K) & 1;
-	bool can_gib = (attributes >> ARC_PAGER_RESV0) & 1;
-	bool can_mib = (attributes >> ARC_PAGER_RESV1) & 1;
-	bool no_create = (attributes >> ARC_PAGER_RESV2) & 1;
-	
-	if (!present && (only_4k || (level == 4 && !can_gib) || (level == 3 && !can_mib) || level == 2) && !no_create && level != 1) {
+	bool only_4k = MASKED_READ(attributes, ARC_PAGER_4K, 1);
+	bool can_gib = MASKED_READ(attributes, ARC_PAGER_RESV0, 1);
+	bool can_mib = MASKED_READ(attributes, ARC_PAGER_RESV1, 1);
+	bool no_create = MASKED_READ(attributes, ARC_PAGER_RESV2, 1);
+
+	if (!no_create && !present && level != 1 && ((level == 4) || (level == 3 && !can_gib) || (level == 2 && !can_mib) || only_4k)) {
 		// Only make a new table if:
 		//     The current entry is not present AND:
 		//         - Mapping is only 4K, or
@@ -163,15 +176,17 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		//         - Can't make a MiB page, or
 		//         - Parent is a level 2 page table
 		//     AND creation of page tables is allowed
-		
+		//     AND not on page level
+
 		address = (uint64_t *)pmm_fast_page_alloc();
-		
+
 		if (address == NULL) {
+			ARC_DEBUG(ERR, "Can't alloc\n");
 			return -1;
 		}
-		
+
 		memset(address, 0, PAGE_SIZE);
-		parent[index] = (uintptr_t)ARC_HHDM_TO_PHYS(address) | get_entry_bits(level, attributes);
+		parent[index] = (uint64_t)address | get_entry_bits(level, attributes);
 	}
 
 	return index;
@@ -189,26 +204,37 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 		return -1;
 	}
 
-	if (info->size == 0) {
-		return 0;
-	}
+	while (info->size) {
+		uint8_t can_gib = ((Arc_KernelMeta->paging_features >> ARC_PAGER_FLAG_1_GIB) & 1)
+				   && (MASKED_READ(info->attributes, ARC_PAGER_4K, 1) == 0) && (info->size >= ONE_GIB);
+		uint8_t can_2mib = (info->size >= TWO_MIB)
+				   && (MASKED_READ(info->attributes, ARC_PAGER_4K, 1) == 0);
 
-	uintptr_t target = info->virtual + info->size;
+		MASKED_WRITE(info->attributes, can_gib, ARC_PAGER_RESV0, 1);
+		MASKED_WRITE(info->attributes, can_2mib, ARC_PAGER_RESV1, 1);
 
-	while (info->virtual < target) {
-		uint64_t *table = info->dest_table;
-		int index = get_page_table(table, 4, info->virtual, info->attributes);
+		uint64_t *table = info->dest_table; // PML4
+		int index = get_page_table(table, 4, info->virtual, info->attributes); // index in PML4
+
+		if (index == -1) {
+			return -2;
+		}
+
 		info->pml4e = index;
 
-		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
-		index = get_page_table(table, 3, info->virtual, info->attributes);
-		info->pml3e = index;
-		bool create_large = ((info->attributes >> ARC_PAGER_RESV0) & 1) & ~((info->attributes >> ARC_PAGER_4K) & 1);
+		table = (uint64_t *)(table[index] & ADDRESS_MASK); // PML4[index] -> PML3
+		index = get_page_table(table, 3, info->virtual, info->attributes); // index in PML3
 
-		if (info->size > ONE_GIB && create_large) {
+		if (index == -1) {
+			return -3;
+		}
+
+		info->pml3e = index;
+
+		if (can_gib) {
 			// Map 1 GiB page
 			if (callback(info, table, index, 3) != 0) {
-				return -3;
+				return -4;
 			}
 
 			info->virtual += ONE_GIB;
@@ -218,15 +244,19 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 			continue;
 		}
 
-		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
+		table = (uint64_t *)(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 2, info->virtual, info->attributes);
-		info->pml2e = index;
-		create_large = ((info->attributes >> ARC_PAGER_RESV1) & 1) & ~((info->attributes >> ARC_PAGER_4K) & 1);
 
-		if (info->size > TWO_MIB && create_large) {
+		if (index == -1) {
+			return -5;
+		}
+
+		info->pml2e = index;
+
+		if (can_2mib) {
 			// Map 2 MiB page
 			if (callback(info, table, index, 2) != 0) {
-				return -2;
+				return -6;
 			}
 
 			info->virtual += TWO_MIB;
@@ -236,13 +266,18 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 			continue;
 		}
 
-		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
+		table = (uint64_t *)(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 1, info->virtual, info->attributes);
+
+		if (index == -1) {
+			return -7;
+		}
+
 		info->pml1e = index;
 
 		// Map 4K page
 		if (callback(info, table, index, 1) != 0) {
-			return -1;
+			return -8;
 		}
 
 		info->virtual += PAGE_SIZE;
