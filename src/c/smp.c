@@ -26,6 +26,7 @@
  * This file implements functions for initializing and managing application processors
  * for symmetric multi-processing.
 */
+#include "arch/x86-64/config.h"
 #include "arch/x86-64/util.h"
 #include "interface/terminal.h"
 #include <arch/x86-64/apic/lapic.h>
@@ -105,12 +106,13 @@ int smp_move_ap_high_mem(struct ap_start_info *info) {
 	lapic_refresh_timer(1000);
 	lapic_calibrate_timer();
 
+
 	_x86_WRMSR(0xC0000102, (uintptr_t)&Arc_ProcessorList[id]);
 
 	init_syscall();
 
 	Arc_ProcessorList[id].flags |= 1 << ARC_SMP_FLAGS_INIT;
-
+	for (;;);
 	ARC_ENABLE_INTERRUPT;
 
 	info->flags |= 1;
@@ -181,8 +183,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	// Allocate space in low memory, copy ap_start code to it
 	// which should bring AP to kernel_main where it will be
 	// detected, logged, and put into smp_hold
-	void *code = pmm_fast_page_alloc_low();
-	void *stack = pmm_fast_page_alloc_low();
+	void *code = pmm_low_alloc(PAGE_SIZE * 2);
+	void *stack = pmm_low_alloc(PAGE_SIZE * 2);
 
 	// NOTE: This is a virtual address
 	void *stack_high = alloc(PAGE_SIZE * 2);
@@ -237,8 +239,8 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE, NULL);
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, NULL);
 
-	pmm_fast_page_free(code);
-	pmm_fast_page_free(stack);
+	pmm_low_free(code);
+	pmm_low_free(stack);
 
 	Arc_ProcessorCounter++;
 

@@ -161,8 +161,7 @@ lm:
         mov rdi, rcx
         add rdi, AP_PML4_OFF
 
-        call rbx
-
+        jmp rbx
         jmp $
 
 global _AP_START_INFO
