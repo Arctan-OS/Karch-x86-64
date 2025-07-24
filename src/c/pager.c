@@ -25,6 +25,7 @@
  * @DESCRIPTION
 */
 #include "arctan.h"
+#include "config.h"
 #include <arch/pager.h>
 #include <arch/x86-64/ctrl_regs.h>
 #include <mm/pmm.h>
@@ -144,7 +145,6 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		ARC_DEBUG(ERR, "NULL parent\n");
 		return -1;
 	}
-
 	int shift = ((level - 1) * 9) + 12;
 	int index = (virtual >> shift) & 0x1FF;
 	uint64_t entry = parent[index];
@@ -177,7 +177,6 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		//         - Parent is a level 2 page table
 		//     AND creation of page tables is allowed
 		//     AND not on page level
-
 		address = (uint64_t *)pmm_fast_page_alloc();
 
 		if (address == NULL) {
@@ -186,7 +185,7 @@ static int get_page_table(uint64_t *parent, int level, uintptr_t virtual, uint32
 		}
 
 		memset(address, 0, PAGE_SIZE);
-		parent[index] = (uint64_t)address | get_entry_bits(level, attributes);
+		parent[index] = (uint64_t)ARC_HHDM_TO_PHYS(address) | get_entry_bits(level, attributes);
 	}
 
 	return index;
@@ -222,7 +221,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 
 		info->pml4e = index;
 
-		table = (uint64_t *)(table[index] & ADDRESS_MASK); // PML4[index] -> PML3
+		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK); // PML4[index] -> PML3
 		index = get_page_table(table, 3, info->virtual, info->attributes); // index in PML3
 
 		if (index == -1) {
@@ -244,7 +243,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 			continue;
 		}
 
-		table = (uint64_t *)(table[index] & ADDRESS_MASK);
+		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 2, info->virtual, info->attributes);
 
 		if (index == -1) {
@@ -266,7 +265,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 			continue;
 		}
 
-		table = (uint64_t *)(table[index] & ADDRESS_MASK);
+		table = (uint64_t *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK);
 		index = get_page_table(table, 1, info->virtual, info->attributes);
 
 		if (index == -1) {
