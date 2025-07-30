@@ -33,6 +33,14 @@
 #define PAGE_SIZE_LOWEST_EXPONENT 12
 #define PAGE_SIZE (size_t)(1 << PAGE_SIZE_LOWEST_EXPONENT)
 
+#ifndef ARC_PMM_LOW_MEM_LIM
+// The first address from zero that is in high memory.
+// Where a is an address:
+// 0 <= a < ARC_PMM_LOW_MEM_LIM -> Low Memory Address
+// ARC_PMM_LOW_MEM_LIM < a -> High Memory Address
+#define ARC_PMM_LOW_MEM_LIM 0x10000
+#endif
+
 #ifndef ARC_PMM_BIASES_DEFINED
 #define ARC_PMM_BIASES_DEFINED
 static const struct ARC_PMMBiasConfigElement pmm_biases_high[] = {
@@ -55,34 +63,12 @@ static const struct ARC_PMMBiasConfigElement pmm_biases_high[] = {
 static const struct ARC_PMMBiasConfigElement pmm_biases_low[] = {
         {
                 .exp = 13,
-                .min_blocks = 12,
-                .min_buddy_exp = PAGE_SIZE_LOWEST_EXPONENT,
-                .ratio.numerator = 2,
-                .ratio.denominator = 3,
-        },
-        {
-                .exp = 14,
-                .min_blocks = 12,
-                .min_buddy_exp = PAGE_SIZE_LOWEST_EXPONENT,
-                .ratio.numerator = 2,
-                .ratio.denominator = 3,
-        },
-        {
-                .exp = 15,
-                .min_blocks = 12,
+                .min_blocks = 1,
                 .min_buddy_exp = PAGE_SIZE_LOWEST_EXPONENT,
                 .ratio.numerator = 2,
                 .ratio.denominator = 3,
         },
 };
-#endif
-
-#ifndef ARC_PMM_LOW_MEM_LIM
-// The first address from zero that is in high memory.
-// Where a is an address:
-// 0 <= a < ARC_PMM_LOW_MEM_LIM -> Low Memory Address
-// ARC_PMM_LOW_MEM_LIM < a -> High Memory Address
-#define ARC_PMM_LOW_MEM_LIM 0x10000
 #endif
 
 #endif
