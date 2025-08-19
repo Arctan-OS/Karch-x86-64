@@ -24,19 +24,17 @@
  *
  * @DESCRIPTION
 */
-#ifndef ARC_ARCH_X86_64_APIC_IOAPIC_H
-#define ARC_ARCH_X86_64_APIC_IOAPIC_H
+#ifndef ARC_ARCH_X86_64_APIC_IO_H
+#define ARC_ARCH_X86_64_APIC_IO_H
 
 #include <stdint.h>
 
-struct ioapic_register {
-        /// Register select
+typedef struct ARC_IOAPICReg {
         uint32_t ioregsel __attribute__((aligned(16)));
-        /// Data
         uint32_t iowin __attribute__((aligned(16)));
-}__attribute__((packed));
+}__attribute__((packed)) ARC_IOAPICReg;
 
-struct ioapic_redir_tbl {
+typedef struct ARC_IOAPICRedirTable {
         uint8_t int_vec;
         uint8_t del_mod : 3;
         uint8_t dest_mod : 1;
@@ -47,13 +45,12 @@ struct ioapic_redir_tbl {
         uint8_t mask : 1;
         uint64_t resv0 : 39;
         uint8_t destination;
-}__attribute__((packed));
+}__attribute__((packed)) ARC_IOAPICRedirTable;
 
-uint32_t ioapic_read_register(struct ioapic_register *ioapic, uint32_t reg);
-int ioapic_write_register(struct ioapic_register *ioapic, uint32_t reg, uint32_t value);
-int ioapic_write_redir_tbl(struct ioapic_register *ioapic, int table_idx, struct ioapic_redir_tbl *table);
-uint64_t ioapic_read_redir_tbl(struct ioapic_register *ioapic, int table_idx);
-
+uint32_t ioapic_read_register(ARC_IOAPICReg *ioapic, uint32_t reg);
+int ioapic_write_register(ARC_IOAPICReg *ioapic, uint32_t reg, uint32_t value);
+int ioapic_write_redir_tbl(ARC_IOAPICReg *ioapic, int table_idx, ARC_IOAPICRedirTable *table);
+uint64_t ioapic_read_redir_tbl(ARC_IOAPICReg *ioapic, int table_idx);
 uint32_t init_ioapic(uint32_t address);
 
 #endif

@@ -24,14 +24,20 @@
  *
  * @DESCRIPTION
 */
-#include <arch/x86-64/apic/lapic.h>
-#include <arch/x86-64/ctrl_regs.h>
-#include <global.h>
 #include <cpuid.h>
-#include <arch/pager.h>
-#include <mm/allocator.h>
 
-struct lapic_reg {
+#include "arch/pager.h"
+#include "arch/x86-64/apic/local.h"
+#include "arch/x86-64/ctrl_regs.h"
+#include "global.h"
+#include "util.h"
+
+#define ADDRESS_MASK 0x0000FFFFFFFFFFFF
+#define GET_LAPIC_MSR _x86_RDMSR(0x1B)
+#define SET_LAPIC_MSR(_lapic_msr) _x86_WRMSR(0x1B, _lapic_msr)
+#define GET_LAPIC_REG(_lapic_msr) (ARC_LAPICReg *)(((_lapic_msr >> 12) & ADDRESS_MASK) << 12)
+
+typedef struct ARC_LAPICReg {
         uint32_t resv0 __attribute__((aligned(16)));
         uint32_t resv1 __attribute__((aligned(16)));
         uint32_t lapic_id __attribute__((aligned(16)));
@@ -96,33 +102,27 @@ struct lapic_reg {
         uint32_t resv15 __attribute__((aligned(16)));
         uint32_t div_conf_reg __attribute__((aligned(16)));
         uint32_t resv16 __attribute__((aligned(16)));
-}__attribute__((packed));
-STATIC_ASSERT(sizeof(struct lapic_reg) == 0x400, "LAPIC reg wrong size, something may be missing");
+}__attribute__((packed)) ARC_LAPICReg;
+STATIC_ASSERT(sizeof(ARC_LAPICReg) == 0x400, "LAPIC reg wrong size, something may be missing");
 
-int lapic_eoi() {
-        uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+void lapic_eoi() {
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 	reg->eoi_reg = 0x0;
-	return 0;
 }
 
-int lapic_ipi(uint8_t vector, uint8_t destination, uint32_t flags) {
+void lapic_ipi(uint8_t vector, uint8_t destination, uint32_t flags) {
 	// NOTE: See Intel SDM Vol. 3 11.6.1 for information on the
 	//       values of the above bit fields
 
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	reg->icr1 = destination << 24;
 	reg->icr0 = vector | flags;
-
-	return 0;
 }
 
 int lapic_ipi_poll() {
 	// Returns the delivery status
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	return (reg->icr0 >> 12) & 1;
 }
@@ -148,44 +148,32 @@ int lapic_calibrate_timer() {
 	return 0;
 }
 
-int lapic_setup_timer(uint8_t vector, uint8_t mode) {
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+void lapic_setup_timer(uint8_t vector, uint8_t mode) {
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	reg->lvt_timer_reg = vector | ((mode & 0b11) << 17);
-
-	return 0;
 }
 
-int lapic_timer_mask(uint8_t mask) {
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+void lapic_timer_mask(uint8_t mask) {
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	if (mask) {
 		reg->lvt_timer_reg |= 1 << 16;
 	} else {
 		reg->lvt_timer_reg &= ~(1 << 16);
 	}
-
-	return 0;
 }
 
-int lapic_refresh_timer(uint32_t count) {
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+void lapic_refresh_timer(uint32_t count) {
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	reg->init_count_reg = count;
-
-	return 0;
 }
 
-int lapic_divide_timer(uint8_t division) {
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-	struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+void lapic_divide_timer(uint8_t division) {
+	ARC_LAPICReg *reg = GET_LAPIC_REG(GET_LAPIC_MSR);
 
 	reg->div_conf_reg = (division & 0b11) | ((division >> 2) & 1) << 3;
-
-	return 0;
 }
 
 int init_lapic() {
@@ -197,16 +185,15 @@ int init_lapic() {
 
         ARC_DEBUG(INFO, "Initializing LAPIC\n");
 
-	uint64_t lapic_msr = _x86_RDMSR(0x1B);
-
-        struct lapic_reg *reg = (struct lapic_reg *)(((lapic_msr >> 12) & 0x0000FFFFFFFFFFFF) << 12);
+	uint64_t lapic_msr = GET_LAPIC_MSR;
+        ARC_LAPICReg *reg = GET_LAPIC_REG(lapic_msr);
 
         if (((lapic_msr >> 8) & 1) == 1) {
                 ARC_DEBUG(INFO, "BSP LAPIC\n");
         }
 
         lapic_msr |= (1 << 11);
-        _x86_WRMSR(0x1B, lapic_msr);
+        SET_LAPIC_MSR(lapic_msr);
 
 	if (pager_map(NULL, (uint64_t)reg, (uint64_t)reg, PAGE_SIZE, 1 << ARC_PAGER_RW | ARC_PAGER_PAT_UC) != 0) {
 		ARC_DEBUG(ERR, "Failed to map LAPIC register\n");

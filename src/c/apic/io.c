@@ -24,25 +24,23 @@
  *
  * @DESCRIPTION
 */
-#include <arch/x86-64/apic/ioapic.h>
-#include <global.h>
-#include <mm/allocator.h>
-#include <arch/pager.h>
-#include <stdint.h>
+#include "arch/pager.h"
+#include "arch/x86-64/apic/io.h"
+#include "global.h"
 
-uint32_t ioapic_read_register(struct ioapic_register *ioapic, uint32_t reg) {
+uint32_t ioapic_read_register(ARC_IOAPICReg *ioapic, uint32_t reg) {
 	ioapic->ioregsel = reg;
 	return ioapic->iowin;
 }
 
-int ioapic_write_register(struct ioapic_register *ioapic, uint32_t reg, uint32_t value) {
+int ioapic_write_register(ARC_IOAPICReg *ioapic, uint32_t reg, uint32_t value) {
 	ioapic->ioregsel = reg;
 	ioapic->iowin = value;
 
 	return 0;
 }
 
-int ioapic_write_redir_tbl(struct ioapic_register *ioapic, int table_idx, struct ioapic_redir_tbl *table) {
+int ioapic_write_redir_tbl(ARC_IOAPICReg *ioapic, int table_idx, ARC_IOAPICRedirTable *table) {
 	int low_dword_i = (table_idx * 2) + 0x10;
 	int high_dword_i = low_dword_i + 1;
 
@@ -54,7 +52,7 @@ int ioapic_write_redir_tbl(struct ioapic_register *ioapic, int table_idx, struct
 	return 0;
 }
 
-uint64_t ioapic_read_redir_tbl(struct ioapic_register *ioapic, int table_idx) {
+uint64_t ioapic_read_redir_tbl(ARC_IOAPICReg *ioapic, int table_idx) {
 	int low_dword_i = (table_idx * 2) + 0x10;
 	int high_dword_i = low_dword_i + 1;
 
@@ -62,7 +60,7 @@ uint64_t ioapic_read_redir_tbl(struct ioapic_register *ioapic, int table_idx) {
 }
 
 uint32_t init_ioapic(uint32_t address) {
-	struct ioapic_register *ioapic = (struct ioapic_register *)((uintptr_t)address);
+	ARC_IOAPICReg *ioapic = (ARC_IOAPICReg *)((uintptr_t)address);
 
 	int map_res = pager_map(NULL, (uintptr_t)ioapic, (uintptr_t)ioapic, PAGE_SIZE, 1 << ARC_PAGER_4K | ARC_PAGER_PAT_UC);
 

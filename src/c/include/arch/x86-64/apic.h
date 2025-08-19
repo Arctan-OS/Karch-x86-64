@@ -24,8 +24,9 @@
  *
  * @DESCRIPTION
 */
-#include <stdint.h>
-
-int apic_map_gsi_irq(uint8_t gsi, uint8_t irq, uint32_t destination, uint32_t flags);
+#ifndef ARC_ARCH_X86_64_APIC_H
+#define ARC_ARCH_X86_64_APIC_H
 
 int init_apic();
+
+#endif

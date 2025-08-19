@@ -24,8 +24,8 @@
  *
  * @DESCRIPTION
 */
-#ifndef ARC_ARCH_X86_64_APIC_LAPIC_H
-#define ARC_ARCH_X86_64_APIC_LAPIC_H
+#ifndef ARC_ARCH_X86_64_APIC_LOCAL_H
+#define ARC_ARCH_X86_64_APIC_LOCAL_H
 
 #include <stdint.h>
 
@@ -49,15 +49,15 @@
 #define ARC_LAPIC_TIMER_PERIODIC 0b01
 #define ARC_LAPIC_TIMER_TSC      0b10
 
-int lapic_eoi();
-int lapic_ipi(uint8_t vector, uint8_t destination, uint32_t flags);
 int lapic_ipi_poll();
 int lapic_get_id();
 int lapic_calibrate_timer();
-int lapic_setup_timer(uint8_t vector, uint8_t mode);
-int lapic_timer_mask(uint8_t mask);
-int lapic_refresh_timer(uint32_t count);
-int lapic_divide_timer(uint8_t division);
+void lapic_eoi();
+void lapic_ipi(uint8_t vector, uint8_t destination, uint32_t flags);
+void lapic_setup_timer(uint8_t vector, uint8_t mode);
+void lapic_timer_mask(uint8_t mask);
+void lapic_refresh_timer(uint32_t count);
+void lapic_divide_timer(uint8_t division);
 
 /*
  * This header contains functions which manage the
