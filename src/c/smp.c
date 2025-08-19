@@ -26,32 +26,31 @@
  * This file implements functions for initializing and managing application processors
  * for symmetric multi-processing.
 */
-#include "arch/x86-64/config.h"
-#include "arch/x86-64/util.h"
-#include "interface/terminal.h"
-#include <arch/x86-64/apic/lapic.h>
-#include <interface/printf.h>
-#include <global.h>
-#include <arch/pager.h>
-#include <mm/pmm.h>
-#include <lib/util.h>
-#include <arch/x86-64/ctrl_regs.h>
-#include <mm/allocator.h>
-#include <arch/x86-64/gdt.h>
-#include <arch/x86-64/idt.h>
-#include <arch/smp.h>
-#include <arch/start.h>
-#include <arch/syscall.h>
+#include "arch/acpi/table.h"
+#include "arch/smp.h"
+#include "arch/interrupt.h"
+#include "arch/syscall.h"
+#include "arch/x86-64/apic/local.h"
+#include "arch/x86-64/ctrl_regs.h"
+#include "arch/x86-64/gdt.h"
+#include "arch/x86-64/interrupt.h"
+#include "arch/x86-64/smp.h"
+#include "lib/util.h"
+#include "mm/allocator.h"
+#include "mm/pmm.h"
+#include "util.h"
+#include "global.h"
 
-struct ap_start_info {
+enum {
+        ARC_AP_INFO_FLAGS_LM = 0,       // The AP has reached LM
+	ARC_AP_INFO_FLAGS_STARTED,      // The AP has started
+	ARC_AP_INFO_FLAGS_PAT,          // AP should use provided PAT
+	ARC_AP_INFO_FLAGS_NX,           // AP can use NX
+};
+
+typedef struct ARC_APStartInfo {
 	uint64_t pml4;
 	uint64_t entry;
-	// Flags
-	//  Bit | Description
-	//  0   | LM reached, core jumping to kernel_entry
-	//  1   | Processor core started
-	//  2   | Use PAT given
-	//  3   | NX
 	uint32_t flags;
 	uint16_t gdt_size;
 	uint64_t gdt_addr;
@@ -63,20 +62,58 @@ struct ap_start_info {
 	uint32_t eax;
 	uint64_t pat;
 	uint64_t stack_high;
-}__attribute__((packed));
+	uint32_t acpi_uid;
+	uint32_t acpi_flags;
+}__attribute__((packed)) ARC_APStartInfo;
 
 extern uint8_t _AP_START_BEGIN;
 extern uint8_t _AP_START_END;
 extern uint8_t _AP_START_INFO;
 
-struct ARC_ProcessorDescriptor Arc_ProcessorList[ARC_MAX_PROCESSORS] = { 0 };
+struct ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
+struct ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
 uint32_t Arc_ProcessorCounter = 0;
-struct ARC_ProcessorDescriptor *Arc_BootProcessor = NULL;
-
-static uint32_t last_lapic = 0;
 
 void smp_hold() {
 	ARC_HANG;
+}
+
+static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
+ 	int id = init_lapic();
+
+	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
+	current->descriptor.acpi_uid = acpi_uid;
+	current->descriptor.acpi_flags = acpi_flags;
+
+	uintptr_t ist1 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
+	uintptr_t rsp0 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
+
+	ARC_TSSDescriptor *tss = init_tss(ist1, rsp0);
+	ARC_GDTRegister *gdtr = init_gdt();
+	gdt_load(gdtr);
+	gdt_use_tss(gdtr, tss);
+
+	ARC_IDTRegister *idtr = init_dynamic_interrupts(256);
+	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
+	interrupt_load(idtr);
+
+//	lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
+//	current->descriptor.timer_ticks = 1000;
+//	current->descriptor.timer_mode = ARC_LAPIC_TIMER_PERIODIC;
+//	lapic_refresh_timer(1000);
+//	lapic_calibrate_timer();
+
+	_x86_WRMSR(0xC0000102, (uintptr_t)current);
+
+	init_syscall();
+
+	if (Arc_ProcessorCounter == 0) {
+		Arc_BootProcessor = current;
+	}
+
+	current->descriptor.flags |= 1 << ARC_SMP_FLAGS_INIT;
+
+	return 0;
 }
 
 /**
@@ -86,36 +123,14 @@ void smp_hold() {
  *
  * @param struct ap_start_info *info - The boot information given by the BSP.
  * */
-int smp_move_ap_high_mem(struct ap_start_info *info) {
+static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 	// NOTE: APs are initialized sequentially, therefore only one AP
 	//       should be executing this code at a time
-	int id = lapic_get_id();
+	smp_register_ap(info->acpi_uid, info->acpi_flags);
 
-	if (id == -1) {
-		ARC_DEBUG(ERR, "This is impossible, how can you have LAPIC but no LAPIC?\n");
-		ARC_HANG;
-	}
-
-	Arc_ProcessorList[id].syscall_stack = init_gdt(id);
-	_install_idt();
-
-	init_lapic();
-	lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
-	Arc_ProcessorList[id].timer_ticks = 1000;
-	Arc_ProcessorList[id].timer_mode = ARC_LAPIC_TIMER_PERIODIC;
-	lapic_refresh_timer(1000);
-	lapic_calibrate_timer();
-
-
-	_x86_WRMSR(0xC0000102, (uintptr_t)&Arc_ProcessorList[id]);
-
-	init_syscall();
-
-	Arc_ProcessorList[id].flags |= 1 << ARC_SMP_FLAGS_INIT;
-	for (;;);
 	ARC_ENABLE_INTERRUPT;
 
-	info->flags |= 1;
+	info->flags |= 1 << ARC_AP_INFO_FLAGS_LM;
 
 	smp_hold();
 
@@ -136,49 +151,17 @@ uint32_t smp_get_processor_id() {
 	return lapic_get_id();
 }
 
-int smp_set_tcb(void *tcb) {
-	struct ARC_ProcessorDescriptor *desc = smp_get_proc_desc();
-	desc->current_thread->tcb = tcb;
-	_x86_WRMSR(0xC0000100, (uintptr_t)tcb);
-
-	return 0;
+void smp_switch_to(ARC_Context *ctx) {
+	(void)ctx;
+	ARC_DEBUG(WARN, "Definitely doing context switch\n");
 }
 
-int smp_switch_to_userspace() {
-	// NOTE: For other architectures this may be useful, however on x86-64, the timer
-	//       interrupt can do this work by setting the return SS and CS to be of ones
-	//       that have a privelege level of 3. This function is kept as a way for the
-	//       kernel to explicitly state that all processors are to be switched to userspace
-	ARC_ENABLE_INTERRUPT;
-
-	return 0;
-}
-
-int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t version) {
-	// NOTE: This function is only called from the BSP
-	Arc_ProcessorList[processor].acpi_uid = acpi_uid;
-	Arc_ProcessorList[processor].acpi_flags = acpi_flags;
-	Arc_ProcessorList[last_lapic].next = &Arc_ProcessorList[processor];
-	last_lapic = processor;
-
+// NOTE: This function is only called from the BSP
+int smp_init_ap(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_t version) {
 	if (processor == (uint32_t)lapic_get_id()) {
-		// BSP
-		Arc_ProcessorList[processor].syscall_stack = init_gdt(processor);
-		init_idt(0x8);
-		init_syscall();
-
-		Arc_BootProcessor = &Arc_ProcessorList[processor];
-		Arc_BootProcessor->flags |= 1 << ARC_SMP_FLAGS_INIT;
-		Arc_ProcessorCounter++;
-		_x86_WRMSR(0xC0000102, (uintptr_t)Arc_BootProcessor);
-
+		smp_register_ap(acpi_uid, acpi_flags);
 		return 0;
 	}
-
-	// Set warm reset in CMOS and warm reset
-        // vector in BDA (not sure if this is needed)
-        // cmos_write(0xF, 0xA);
-        // *(uint32_t *)(ARC_PHYS_TO_HHDM(0x467)) = (uint32_t)((uintptr_t)code);
 
 	// Allocate space in low memory, copy ap_start code to it
 	// which should bring AP to kernel_main where it will be
@@ -194,7 +177,7 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 
 	memset(code, 0, PAGE_SIZE);
 	memcpy(code, (void *)&_AP_START_BEGIN, (size_t)((uintptr_t)&_AP_START_END - (uintptr_t)&_AP_START_BEGIN));
-	struct ap_start_info *info = (struct ap_start_info *)((uintptr_t)code + ((uintptr_t)&_AP_START_INFO - (uintptr_t)&_AP_START_BEGIN));
+	ARC_APStartInfo *info = (ARC_APStartInfo *)((uintptr_t)code + ((uintptr_t)&_AP_START_INFO - (uintptr_t)&_AP_START_BEGIN));
 
 	info->pml4 = _x86_getCR3();
 	info->entry = (uintptr_t)smp_move_ap_high_mem;
@@ -203,8 +186,10 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	info->gdt_size = 0x1F;
 	info->gdt_addr = ARC_HHDM_TO_PHYS(&info->gdt_table);
 	info->pat = _x86_RDMSR(0x277);
-	info->flags |= (1 << 2);
-	info->flags |= ((Arc_KernelMeta->paging_features & 1) << 3);
+	info->flags |= (1 << ARC_AP_INFO_FLAGS_PAT);
+	info->flags |= ((Arc_KernelMeta->paging_features & 1) << ARC_AP_INFO_FLAGS_NX);
+	info->acpi_flags = acpi_flags;
+	info->acpi_uid = acpi_uid;
 
 	ARC_MEM_BARRIER;
 
@@ -229,12 +214,12 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	}
 
 	// TODO: If this flag is not set within a reasonable time, skip this processor
-	while (((info->flags >> 1) & 1) == 0) __asm__("pause");
+	while (((info->flags >> ARC_AP_INFO_FLAGS_STARTED) & 1) == 0) __asm__("pause");
 
 	ARC_DEBUG(INFO, "AP %d BIST: 0x%x\n", processor, info->eax);
 
 	// TODO: If BIST indicates error, shut down AP, move on
-	while ((info->flags & 1) == 0) __asm__("pause");
+	while (((info->flags >> ARC_AP_INFO_FLAGS_LM) & 1) == 0) __asm__("pause");
 
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(code), PAGE_SIZE, NULL);
 	pager_unmap(NULL, ARC_HHDM_TO_PHYS(stack), PAGE_SIZE, NULL);
@@ -243,6 +228,25 @@ int init_smp(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint32_
 	pmm_low_free(stack);
 
 	Arc_ProcessorCounter++;
+
+	return 0;
+}
+
+int init_smp() {
+	ARC_MADTIterator it = NULL;
+
+	size_t processors = 0;
+
+	while (acpi_get_next_madt_entry(ARC_MADT_ENTRY_TYPE_LAPIC, &it) != NULL) {
+		processors++;
+	}
+
+	Arc_ProcessorList = (ARC_x64ProcessorDescriptor *)alloc(sizeof(*Arc_ProcessorList) * processors);
+
+	if (Arc_ProcessorList == NULL) {
+		ARC_DEBUG(ERR, "Failed to initialize SMP\n");
+		return -2;
+	}
 
 	return 0;
 }
