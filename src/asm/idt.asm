@@ -31,8 +31,7 @@ bits 64
 global _install_idt
 extern idtr
 _install_idt:
-        lea rax, [rel idtr]
-        lidt [rax]
+        lidt [rdi]
         xor rax, rax
         ret
 
@@ -55,8 +54,6 @@ _idt_stub_%1:
 
         POP_ALL
         iretq
-_idt_stub_%1_t0:        dq 0x0
-_idt_stub_%1_t1:        dq 0x0
 %endmacro
 
 common_idt_stub 0
@@ -91,23 +88,3 @@ common_idt_stub 28
 common_idt_stub 29
 common_idt_stub 30
 common_idt_stub 31
-common_idt_stub 32
-
-common_idt_stub 33
-common_idt_stub 34
-common_idt_stub 35
-common_idt_stub 36
-common_idt_stub 37
-common_idt_stub 38
-common_idt_stub 39
-common_idt_stub 40
-common_idt_stub 41
-common_idt_stub 42
-common_idt_stub 43
-common_idt_stub 44
-common_idt_stub 45
-common_idt_stub 46
-common_idt_stub 47
-common_idt_stub 48
-common_idt_stub 49
-common_idt_stub 50
