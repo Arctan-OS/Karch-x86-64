@@ -32,9 +32,7 @@ extern gdtr
 global _install_gdt
 _install_gdt:
         cli
-        push rax
-        lea rax, [rel gdtr]
-        lgdt [rax]
+        lgdt [rdi]
         ;; Do a ret long jump to set CS
         push 0x08
         lea rax, [rel _gdt_set_cs]
@@ -48,10 +46,11 @@ _gdt_set_cs:
         mov gs, ax
         mov ss, ax
         mov es, ax
-        pop rax
+        xor rax, rax
         ret
 
 global _install_tss
 _install_tss:
         ltr di
+        xor rax, rax
         ret
