@@ -1,5 +1,5 @@
 /**
- * @file start.c
+ * @file hpet.h
  *
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
@@ -24,30 +24,9 @@
  *
  * @DESCRIPTION
 */
-#include "arch/smp.h"
-#include "arch/x86-64/interrupt.h"
-#include "arch/x86-64/apic.h"
-#include "arch/x86-64/hpet.h"
-#include "global.h"
+#ifndef ARC_ARCH_X86_64_HPET_H
+#define ARC_ARCH_X86_64_HPET_H
 
-int init_arch_early() {
-	init_early_exceptions();
-	interrupt_load(&idt_register);
-	// NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
-	//       provide an OK one to use. Only during APIC initialization does a
-	//       GDT really need to get created
+int init_hpet();
 
-	return 0;
-}
-
-int init_arch() {
-	init_hpet();
-	init_smp();
-
-        if (init_apic() != 0) {
-		ARC_DEBUG(ERR, "Failed to initialize interrupts\n");
-		ARC_HANG;
-	}
-
-	return 0;
-}
+#endif
