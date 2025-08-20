@@ -1,5 +1,5 @@
 /**
- * @file context.h
+ * @file context.c
  *
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
@@ -24,49 +24,24 @@
  *
  * @DESCRIPTION
 */
-#ifndef ARC_ARCH_X86_64_CONTEXT_H
-#define ARC_ARCH_X86_64_CONTEXT_H
+#include "arch/context.h"
+#include "arch/x86-64/ctrl_regs.h"
 
-#include <stdint.h>
+#define GS_BASE_MSR 0xC0000100
 
-typedef struct ARC_IDTFrame {
-        uint64_t rip;
-        uint64_t cs;
-        uint64_t rflags;
-        uint64_t rsp;
-        uint64_t ss;
-} __attribute__((packed)) ARC_IDTFrame;
+void context_set_tcb(ARC_Context *ctx, void *tcb) {
+        _x86_WRMSR(GS_BASE_MSR, (uintptr_t)tcb);
+        ctx->tcb = tcb;
+}
 
-typedef struct ARC_Registers {
-	uint64_t cr3;
-	uint64_t rax;
-	uint64_t rbx;
-	uint64_t rcx;
-	uint64_t rdx;
-	uint64_t rsi;
-	uint64_t rdi;
-	uint64_t r8;
-	uint64_t r9;
-	uint64_t r10;
-	uint64_t r11;
-	uint64_t r12;
-	uint64_t r13;
-	uint64_t r14;
-	uint64_t r15;
-	uint64_t rbp;
-	uint64_t rsp;
-	uint64_t cs;
-	uint64_t rip;
-	uint64_t ss;
-	uint64_t rflags;
-}__attribute__((packed)) ARC_Registers;
+void *context_get_tcb(ARC_Context *ctx) {
+        return ctx->tcb;
+}
 
-typedef struct ARC_Context {
-	void *fxsave_space;
-	void *tcb;
-	uint64_t cr0;
-	uint64_t cr4;
-	struct ARC_Registers regs;
-} ARC_Context;
+void context_load() {
 
-#endif
+}
+
+void context_save() {
+
+}
