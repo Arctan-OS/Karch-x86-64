@@ -48,7 +48,7 @@ void install_idt_gate(ARC_IDTEntry *entry, uint64_t offset, uint16_t segment, ui
 }
 
 // What if multiple functions could be registered to an interrupt?
-int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_Registers *), bool kernel) {
+int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_InterruptFrame *), bool kernel) {
 	if (number >= 256) {
 		return -1;
 	}

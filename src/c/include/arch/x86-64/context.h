@@ -29,14 +29,6 @@
 
 #include <stdint.h>
 
-typedef struct ARC_IDTFrame {
-        uint64_t rip;
-        uint64_t cs;
-        uint64_t rflags;
-        uint64_t rsp;
-        uint64_t ss;
-} __attribute__((packed)) ARC_IDTFrame;
-
 typedef struct ARC_Registers {
 	uint64_t cr3;
 	uint64_t rax;
@@ -55,11 +47,17 @@ typedef struct ARC_Registers {
 	uint64_t r15;
 	uint64_t rbp;
 	uint64_t rsp;
-	uint64_t cs;
-	uint64_t rip;
-	uint64_t ss;
-	uint64_t rflags;
 }__attribute__((packed)) ARC_Registers;
+
+typedef struct ARC_InterruptFrame {
+	ARC_Registers gpr;
+	uint64_t error;
+        uint64_t rip;
+        uint64_t cs;
+        uint64_t rflags;
+        uint64_t rsp;
+        uint64_t ss;
+} __attribute__((packed)) ARC_InterruptFrame;
 
 typedef struct ARC_Context {
 	void *fxsave_space;

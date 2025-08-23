@@ -43,6 +43,12 @@ section .text
 global _idt_stub_%1
 extern generic_interrupt_handler_%1
 _idt_stub_%1:
+%if %1 != 8 && %1 != 10 && %1 != 12 && %1 != 13 && %1 != 14 && %1 != 17 && %1 != 21
+        ;; In the event that the interrupt does not produce an error code,
+        ;; push a dummy error code to make stack interpretation a little easier
+        ;; in C land
+        push 0
+%endif
         PUSH_ALL
 
         mov rdi, rsp
@@ -53,6 +59,7 @@ _idt_stub_%1:
         call generic_interrupt_handler_%1
 
         POP_ALL
+        add rsp, 8
         iretq
 %endmacro
 
