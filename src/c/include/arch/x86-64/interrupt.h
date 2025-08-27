@@ -28,14 +28,8 @@
 #define ARC_ARCH_X86_64_INTERRUPT_H
 
 #include "arch/interrupt.h"
-#include "arch/pager.h"
-#include "arch/x86-64/apic/local.h"
-#include "arch/x86-64/context.h"
-#include "arch/x86-64/util.h"
-#include "interface/printf.h"
-#include "lib/atomics.h"
+#include "arch/context.h"
 
-#include <inttypes.h>
 #include <stdint.h>
 
 // TODO: Using printf in an interrupt (that doesn't panic the kernel) will cause
@@ -43,46 +37,24 @@
 //       interrupt handler should not use printfs. The best way to resolve this is to
 //       make it so that printfs do not deadlock.
 
-#define GENERIC_HANDLER(_vector)                                        \
-        extern void _idt_stub_##_vector();                              \
-        void generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
-
-#define GENERIC_HANDLER_PREAMBLE                               \
-        pager_switch_to_kpages();                                       \
-        int processor_id = lapic_get_id();                              \
-        (void)processor_id;                                             \
-
-#define GENERIC_EXCEPTION_REG_DUMP(_vector) \
-        spinlock_lock(&panic_lock);                                     \
-        printf("Received Interrupt %d (%s) from LAPIC %d\n", _vector,   \
-               exception_names[_vector], processor_id);                 \
-        printf("RAX: 0x%016" PRIx64 "\n", frame->gpr.rax);                   \
-        printf("RBX: 0x%016" PRIx64 "\n", frame->gpr.rbx);                   \
-        printf("RCX: 0x%016" PRIx64 "\n", frame->gpr.rcx);                   \
-        printf("RDX: 0x%016" PRIx64 "\n", frame->gpr.rdx);                   \
-        printf("RSI: 0x%016" PRIx64 "\n", frame->gpr.rsi);                   \
-        printf("RDI: 0x%016" PRIx64 "\n", frame->gpr.rdi);                   \
-        printf("RSP: 0x%016" PRIx64 "\tSS: 0x%" PRIx64 "\n", frame->gpr.rsp,         \
-               frame->ss);                                    \
-        printf("RBP: 0x%016" PRIx64 "\n", frame->gpr.rbp);                   \
-        printf("R8 : 0x%016" PRIx64 "\n", frame->gpr.r8);                    \
-        printf("R9 : 0x%016" PRIx64 "\n", frame->gpr.r9);                    \
-        printf("R10: 0x%016" PRIx64 "\n", frame->gpr.r10);                   \
-        printf("R11: 0x%016" PRIx64 "\n", frame->gpr.r11);                   \
-        printf("R12: 0x%016" PRIx64 "\n", frame->gpr.r12);                   \
-        printf("R13: 0x%016" PRIx64 "\n", frame->gpr.r13);                   \
-        printf("R14: 0x%016" PRIx64 "\n", frame->gpr.r14);                   \
-        printf("R15: 0x%016" PRIx64 "\n", frame->gpr.r15);                   \
-        printf("RFLAGS: 0x016%" PRIx64 "\n", frame->rflags);  \
-        printf("Return address: 0x%"PRIx64":0x%016"PRIx64"\n", frame->cs, \
-               frame->rip);                                   \
-        printf("Error code: 0x%"PRIx64"\n", frame->error);      \
-
-#define GENERIC_HANDLER_POSTAMBLE      \
-        lapic_eoi();
-
-#define GENERIC_HANDLER_INSTALL(_entries, _vector, _segment, _ist)        \
-        install_idt_gate(&_entries[_vector], (uintptr_t)&_idt_stub_##_vector, _segment, 0x8E, _ist);
+// NOTE: This function will automatically push an additional value (0) to the stack to
+//       take the place of an error code such that the interrupt frame structure does
+//       not have to change
+//
+//       This should be used for interrupt vectors 8, 10, 12, 13, 14, 17, and 21; all
+//       other vectors, including all IRQs from 32 to 255 should be fine to use this
+//       macro
+#define ARC_DEFINE_IRQ_HANDLER(_handler) \
+        void __attribute__((naked)) irq_handler_##_handler() { \
+                __asm__("push 0"); \
+                ARC_ASM_PUSH_ALL \
+                __asm__("mov ax, 0x10; mov ss, ax"); \
+                __asm__("mov ax, cs; cmp ax, [rsp + 152]; je 1f; swapgs; 1:"); \
+                __asm__("mov rdi, rsp; call %0" :: "i"(_handler) :); \
+                __asm__("mov ax, cs; cmp ax, [rsp + 152]; je 1f; swapgs; 1:"); \
+                ARC_ASM_POP_ALL \
+                __asm__("add rsp, 8; iretq"); \
+        }
 
 typedef struct ARC_IDTEntry {
         uint16_t offset1;
@@ -98,44 +70,6 @@ typedef struct ARC_IDTRegister {
         uint16_t limit;
         uint64_t base;
 } __attribute__((packed)) ARC_IDTRegister;
-
-static const char *exception_names[] = {
-        "Division Error (#DE)",
-        "Debug Exception (#DB)",
-        "NMI",
-        "Breakpoint (#BP)",
-        "Overflow (#OF)",
-        "BOUND Range Exceeded (#BR)",
-        "Invalid Opcode (#UD)",
-        "Device Not Available (No Math Coprocessor) (#NM)",
-        "Double Fault (#DF)",
-        "Coprocessor Segment Overrun (Reserved)",
-        "Invalid TSS (#TS)",
-        "Segment Not Present (#NP)",
-        "Stack-Segment Fault (#SS)",
-        "General Protection (#GP)",
-        "Page Fault (#PF)",
-        "Reserved",
-        "x87 FPU Floating-Point Error (Math Fault) (#MF)",
-        "Alignment Check (#AC)",
-        "Machine Check (#MC)",
-        "SIMD Floating-Point Exception (#XM)",
-        "Virtualization Exception (#VE)",
-        "Control Protection Exception (#CP)",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-        "Reserved",
-};
-
-extern ARC_IDTEntry idt_entries[32];
-extern ARC_IDTRegister idt_register;
 
 void install_idt_gate(ARC_IDTEntry *entry, uint64_t offset, uint16_t segment, uint8_t attrs, int ist);
 int internal_init_early_exceptions(ARC_IDTEntry *entries, uint16_t kcode_seg, uint8_t ist);

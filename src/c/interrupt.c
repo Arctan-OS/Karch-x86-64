@@ -32,7 +32,6 @@
 #include "mm/allocator.h"
 #include "util.h"
 
-#define EARLY_KERNEL_CS 0x18
 #define KERNEL_CS 0x08
 #define USER_CS 0x18
 
@@ -54,12 +53,15 @@ int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_InterruptF
 	}
 
 	ARC_IDTRegister *reg = (ARC_IDTRegister *)handle;
+	ARC_IDTEntry *entries = NULL;
 
 	if (reg == NULL) {
-		// Set reg to current processor's interrupt table
+		ARC_IDTRegister t = { 0 };
+		__asm__("sidt %0" :: "m"(t) :);
+		reg = &t;
 	}
 
-	ARC_IDTEntry *entries = (ARC_IDTEntry *)reg->base;
+	entries = (ARC_IDTEntry *)reg->base;
 
 	ARC_DISABLE_INTERRUPT;
 
@@ -106,11 +108,3 @@ void *init_dynamic_interrupts(int count) {
 	return reg;
 }
 
-int init_early_irqs() {
-	ARC_DEBUG(INFO, "No early IRQs");
-	return 0;
-}
-
-int init_early_exceptions() {
-	return internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
-}

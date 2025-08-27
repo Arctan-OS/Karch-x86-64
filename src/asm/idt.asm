@@ -53,10 +53,22 @@ _idt_stub_%1:
 
         mov rdi, rsp
 
+        mov ax, cs
+        cmp ax, [rsp + 152]
+        je .over
+        swapgs
+        .over:
+
         mov ax, 0x10
         mov ss, ax
 
         call generic_interrupt_handler_%1
+
+        mov ax, cs
+        cmp ax, [rdi + 152]
+        je .over
+        swapgs
+        .over1:
 
         POP_ALL
         add rsp, 8
