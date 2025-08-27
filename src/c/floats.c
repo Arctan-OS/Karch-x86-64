@@ -58,15 +58,11 @@ static int init_sse(struct ARC_Context *context) {
 		return -2;
 	}
 
-	uint64_t cr0 = _x86_getCR0();
-	cr0 &= ~(1 << 2); // Disable x87 FPU emulation
-	cr0 |= (1 << 1);
-	_x86_setCR0(cr0);
+	context->cr0 &= ~(1 << 2); // Disable x87 FPU emulation
+	context->cr0 |= (1 << 1);
 
-	uint64_t cr4 = _x86_getCR4();
-	cr4 |= (1 << 9); // OSFXSR
-	cr4 |= (1 << 10); // OSXMMEXCPT
-	_x86_setCR4(cr4);
+	context->cr4 |= (1 << 9); // OSFXSR
+	context->cr4 |= (1 << 10); // OSXMMEXCPT
 
 	void *fxsave_space = alloc(512);
 	
@@ -78,8 +74,6 @@ static int init_sse(struct ARC_Context *context) {
 	memset(fxsave_space, 0, 512);
 	
 	context->fxsave_space = fxsave_space;
-	context->cr0 = cr0;
-	context->cr4 = cr4;
 
 	return 0;
 }
