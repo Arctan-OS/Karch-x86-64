@@ -36,45 +36,21 @@ global _syscall
 extern Arc_SyscallTable
 extern Arc_KernelPageTables
 _syscall:
-        cli
-        
-        ;; Get stack
-        ;; Unfortunately can't use rdgsbase rax
-
-        push r12
-        push r10
-
+        swapgs
+        ;; Save return address
         push rcx
-        push rdx
-        push rax
-        swapgs
-        mov ecx, 0xC0000101
-        rdmsr
-        swapgs
-        mov r12, rax
-        pop rax
-        pop rdx
-        pop rcx
-
-        ;; Have to do this silliness as upper 32-bits of processor
-        ;; descriptor are not preserved in GS base
-        xor r10, r10
-        not r10
-        shl r10, 32
-        or r12, r10
-        ;; Finally change the stack
-        mov r10, rsp
-        mov rsp, qword [r12]
-        ;; Push caller state except RSP
-        push r10
+        mov rcx, rsp
+        mov rsp, [gs:0]
+        ;; Save user stack
+        push rcx
+        ;; Save user context
         PUSH_ALL
 
         ;; Call handler
         shl rax, 3
         mov r12, Arc_SyscallTable
-        add r12, rax
-        mov r12, [r12]
-        call r12
+        add rax, r12
+        call [rax]
 
         ;; Preserve RAX from here on, as it contains return code
 
@@ -83,11 +59,12 @@ _syscall:
         pop r10                 ; RAX
         push rax                ; New RAX
         push r11                ; CR3
-        ;; Restore caller state except RSP
+        ;; Restore user context
         POP_ALL
+        ;; Restore user stack
         pop rsp
-
-        pop r10
-        pop r12
+        ;; Restore return address
+        pop rcx
+        swapgs
 
         o64 sysret
