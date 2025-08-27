@@ -27,6 +27,7 @@
  * for symmetric multi-processing.
 */
 #include "arch/acpi/table.h"
+#include "arch/pager.h"
 #include "arch/smp.h"
 #include "arch/interrupt.h"
 #include "arch/syscall.h"
@@ -72,6 +73,7 @@ extern uint8_t _AP_START_INFO;
 
 struct ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
 struct ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
+ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor = NULL;
 uint32_t Arc_ProcessorCounter = 0;
 
 void smp_hold() {
@@ -82,8 +84,26 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
  	int id = init_lapic();
 
 	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
-	current->descriptor.acpi_uid = acpi_uid;
-	current->descriptor.acpi_flags = acpi_flags;
+	context_set_proc_desc(current);
+
+
+
+	if (Arc_ProcessorCounter == 0) {
+		Arc_BootProcessor = current;
+	}
+
+	ARC_ProcessorDescriptor *desc = alloc(sizeof(*desc));
+	if (desc == NULL) {
+		ARC_DEBUG(ERR, "Failed to create processor descriptor\n");
+		ARC_HANG;
+	}
+
+	memset(desc, 0, sizeof(*desc));
+
+	current->descriptor = desc;
+
+	desc->acpi_uid = acpi_uid;
+	desc->acpi_flags = acpi_flags;
 
 	uintptr_t ist1 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 	uintptr_t rsp0 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
@@ -97,21 +117,21 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
 	interrupt_load(idtr);
 
-//	lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
-//	current->descriptor.timer_ticks = 1000;
-//	current->descriptor.timer_mode = ARC_LAPIC_TIMER_PERIODIC;
-//	lapic_refresh_timer(1000);
-//	lapic_calibrate_timer();
-
-	_x86_WRMSR(0xC0000102, (uintptr_t)current);
-
 	init_syscall();
 
 	if (Arc_ProcessorCounter == 0) {
-		Arc_BootProcessor = current;
+		lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
+		desc->timer_ticks = 1000;
+		desc->timer_mode = ARC_LAPIC_TIMER_PERIODIC;
+		lapic_refresh_timer(1000);
+		lapic_calibrate_timer();
 	}
 
-	current->descriptor.flags |= 1 << ARC_SMP_FLAGS_INIT;
+	Arc_ProcessorCounter++;
+
+	__asm__("swapgs");
+
+	desc->flags |= 1 << ARC_SMP_FLAGS_INIT;
 
 	return 0;
 }
@@ -138,13 +158,7 @@ static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 }
 
 struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
-	struct ARC_ProcessorDescriptor *result = NULL;
-
-	__asm__("swapgs");
-	result = (struct ARC_ProcessorDescriptor *)_x86_RDMSR(0xC0000101);
-	__asm__("swapgs");
-
-	return result;
+	return Arc_CurProcessorDescriptor->descriptor;
 }
 
 uint32_t smp_get_processor_id() {
@@ -226,8 +240,6 @@ int smp_init_ap(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint
 
 	pmm_low_free(code);
 	pmm_low_free(stack);
-
-	Arc_ProcessorCounter++;
 
 	return 0;
 }

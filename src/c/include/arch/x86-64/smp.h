@@ -36,7 +36,7 @@
 //       is this structure. This would also eliminate the need for a processor descriptor list.
 typedef struct ARC_x64ProcessorDescriptor {
         uintptr_t syscall_stack;
-        ARC_ProcessorDescriptor descriptor;
+        ARC_ProcessorDescriptor *descriptor;
 } __attribute__((packed)) ARC_x64ProcessorDescriptor;
 
 // NOTE: The index in Arc_ProcessorList corresponds to the ID
@@ -47,6 +47,19 @@ extern ARC_x64ProcessorDescriptor *Arc_ProcessorList;
 //       while still being able to address the list by processor ID
 //       in O(1) time
 extern ARC_x64ProcessorDescriptor *Arc_BootProcessor;
+
+// The current processor descriptor
+extern ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor;
+
+/**
+ * Set the processor descriptor
+ *
+ * Sets KERNEL_GS_BASE MSR to the given pointer. This function
+ * is defined in context.c
+ *
+ * @param ARC_x64ProcessorDescriptor *desc - The processor descriptor to set
+ * */
+void context_set_proc_desc(ARC_x64ProcessorDescriptor *desc);
 
 /**
  * Initialize an AP into an SMP system.
