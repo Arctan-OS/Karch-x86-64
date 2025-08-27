@@ -29,6 +29,46 @@
 
 #include <stdint.h>
 
+#define ARC_ASM_PUSH_ALL \
+        asm("push rsp; \
+        push rbp; \
+        push r15; \
+        push r14; \
+        push r13; \
+        push r12; \
+        push r11; \
+        push r10; \
+        push r9;  \
+        push r8;  \
+        push rdi; \
+        push rsi; \
+        push rdx; \
+        push rcx; \
+        push rbx; \
+        push rax; \
+        mov r15, cr3; \
+        push r15;");
+
+#define ARC_ASM_POP_ALL \
+        asm("pop r15; \
+        mov cr3, r15; \
+        pop rax; \
+        pop rbx; \
+        pop rcx; \
+        pop rdx; \
+        pop rsi; \
+        pop rdi; \
+        pop r8;  \
+        pop r9;  \
+        pop r10; \
+        pop r11; \
+        pop r12; \
+        pop r13; \
+        pop r14; \
+        pop r15; \
+        pop rbp; \
+        pop rsp;");
+
 typedef struct ARC_Registers {
 	uint64_t cr3;
 	uint64_t rax;
@@ -64,7 +104,7 @@ typedef struct ARC_Context {
 	void *tcb;
 	uint64_t cr0;
 	uint64_t cr4;
-	struct ARC_Registers regs;
+	ARC_InterruptFrame frame;
 } ARC_Context;
 
 #endif

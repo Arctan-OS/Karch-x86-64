@@ -25,9 +25,13 @@
  * @DESCRIPTION
 */
 #include "arch/context.h"
+#include "arch/smp.h"
 #include "arch/x86-64/ctrl_regs.h"
+#include "arch/x86-64/smp.h"
 
-#define GS_BASE_MSR 0xC0000100
+#define FS_BASE_MSR  0xC0000000
+#define GS_BASE_MSR  0xC0000101
+#define KGS_BASE_MSR 0xC0000102
 
 void context_set_tcb(ARC_Context *ctx, void *tcb) {
         _x86_WRMSR(GS_BASE_MSR, (uintptr_t)tcb);
@@ -38,10 +42,6 @@ void *context_get_tcb(ARC_Context *ctx) {
         return ctx->tcb;
 }
 
-void context_load() {
-
-}
-
-void context_save() {
-
+void context_set_proc_desc(ARC_x64ProcessorDescriptor *desc) {
+        _x86_WRMSR(KGS_BASE_MSR, (uintptr_t)desc);
 }
