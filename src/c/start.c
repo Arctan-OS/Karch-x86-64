@@ -27,11 +27,18 @@
 #include "arch/smp.h"
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/apic.h"
-#include "arch/x86-64/hpet.h"
 #include "global.h"
 
+#define EARLY_KERNEL_CS 0x18
+
+ARC_IDTEntry idt_entries[32] = { 0 };
+ARC_IDTRegister idt_register = {
+        .base = (uintptr_t)&idt_entries,
+        .limit = sizeof(idt_entries) * 16 - 1
+};
+
 int init_arch_early() {
-	init_early_exceptions();
+	internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
 	interrupt_load(&idt_register);
 	// NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
 	//       provide an OK one to use. Only during APIC initialization does a
@@ -41,9 +48,6 @@ int init_arch_early() {
 }
 
 int init_arch() {
-	init_hpet();
-	init_smp();
-
         if (init_apic() != 0) {
 		ARC_DEBUG(ERR, "Failed to initialize interrupts\n");
 		ARC_HANG;
