@@ -4,12 +4,12 @@
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
  * @LICENSE
- * Arctan-OS/Kernel - Operating System Kernel
+ * Arctan-OS/Karch-x86-64 - x86-64 Implementation of K/arch Abstractions
  * Copyright (C) 2023-2025 awewsomegamer
  *
- * This file is part of Arctan-OS/Kernel.
+ * This file is part of Arctan-OS/Karch-x86-64.
  *
- * Arctan is free software; you can redistribute it and/or
+ * Arctan-OS/Karch-x86-64 is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  *
@@ -32,7 +32,7 @@
 #include "arch/x86-64/util.h"
 #include "global.h"
 #include "interface/printf.h"
-#include "lib/atomics.h"
+#include "lib/spinlock.h"
 
 #define GENERIC_HANDLER(_vector)                                        \
         extern void _idt_stub_##_vector();                              \
@@ -110,8 +110,7 @@ static const char *exception_names[] = {
         "Reserved",
 };
 
-
-static ARC_GenericSpinlock panic_lock;
+static ARC_Spinlock panic_lock;
 
 GENERIC_HANDLER(0) {
 	GENERIC_HANDLER_PREAMBLE;

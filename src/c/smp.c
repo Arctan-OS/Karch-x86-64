@@ -4,12 +4,12 @@
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
  * @LICENSE
- * Arctan-OS/Kernel - Operating System Kernel
+ * Arctan-OS/Karch-x86-64 - x86-64 Implementation of K/arch Abstractions
  * Copyright (C) 2023-2025 awewsomegamer
  *
- * This file is part of Arctan-OS/Kernel.
+ * This file is part of Arctan-OS/Karch-x86-64.
  *
- * Arctan is free software; you can redistribute it and/or
+ * Arctan-OS/Karch-x86-64 is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; version 2
  *
@@ -86,8 +86,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
 	context_set_proc_desc(current);
 
-
-
 	if (Arc_ProcessorCounter == 0) {
 		Arc_BootProcessor = current;
 	}
@@ -158,6 +156,13 @@ static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 }
 
 struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
+	if (Arc_ProcessorCounter == 0) {
+		// No processors have been initialized yet into an SMP system,
+		// therefore it can be assumed that GS = 0. Accessing
+		// CurProcessorDescriptor would lead to a PF, so return
+		// NULL
+		return NULL;
+	}
 	return Arc_CurProcessorDescriptor->descriptor;
 }
 
