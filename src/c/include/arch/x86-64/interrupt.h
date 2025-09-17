@@ -42,13 +42,13 @@
 //       other vectors, including all IRQs from 32 to 255 should be fine to use this
 //       macro
 #define ARC_DEFINE_IRQ_HANDLER(_handler) \
-        void __attribute__((naked)) irq_handler_##_handler() { \
+        void __attribute__((naked)) ARC_NAME_IRQ(_handler)() { \
                 __asm__("push 0"); \
                 ARC_ASM_PUSH_ALL \
                 __asm__("mov ax, 0x10; mov ss, ax"); \
-                __asm__("mov ax, cs; cmp ax, [rsp + 152]; je 1f; swapgs; 1:"); \
+                __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
                 __asm__("mov rdi, rsp; call %0" :: "i"(_handler) :); \
-                __asm__("mov ax, cs; cmp ax, [rsp + 152]; je 1f; swapgs; 1:"); \
+                __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
                 ARC_ASM_POP_ALL \
                 __asm__("add rsp, 8; iretq"); \
         }
