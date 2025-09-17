@@ -38,12 +38,13 @@ _install_idt:
 %include "src/asm/context.asm"
 
 extern Arc_KernelPageTables
+
 %macro common_idt_stub 1
 section .text
 global _idt_stub_%1
 extern generic_interrupt_handler_%1
 _idt_stub_%1:
-%if %1 != 8 && %1 != 10 && %1 != 12 && %1 != 13 && %1 != 14 && %1 != 17 && %1 != 21
+%if %1 != 8 && %1 != 10 && %1 != 11 && %1 != 12 && %1 != 13 && %1 != 14 && %1 != 17 && %1 != 21
         ;; In the event that the interrupt does not produce an error code,
         ;; push a dummy error code to make stack interpretation a little easier
         ;; in C land
@@ -54,7 +55,7 @@ _idt_stub_%1:
         mov rdi, rsp
 
         mov ax, cs
-        cmp ax, [rsp + 152]
+        cmp ax, [rsp + 160]
         je .over
         swapgs
         .over:
@@ -65,13 +66,14 @@ _idt_stub_%1:
         call generic_interrupt_handler_%1
 
         mov ax, cs
-        cmp ax, [rdi + 152]
-        je .over
+        cmp ax, [rsp + 160]
+        je .over1
         swapgs
         .over1:
 
         POP_ALL
         add rsp, 8
+
         iretq
 %endmacro
 
