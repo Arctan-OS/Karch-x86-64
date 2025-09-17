@@ -119,11 +119,11 @@ int init_apic() {
 		ioapic_list = next;
 	}
 
-	if (it != NULL) {
+	// if (it != NULL) {
 		// Disable 8259
 		outb(0x21, 0xFF);
 		outb(0xA1, 0xFF);
-	}
+	// }
 
 	return 0;
 }
