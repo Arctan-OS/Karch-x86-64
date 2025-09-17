@@ -37,14 +37,17 @@ extern Arc_SyscallTable
 extern Arc_KernelPageTables
 _syscall:
         swapgs
-        ;; Save return address
-        push rcx
-        mov rcx, rsp
-        mov rsp, [gs:0]
-        ;; Save user stack
-        push rcx
-        ;; Save user context
-        PUSH_ALL
+
+        mov rdx, rsp            ; Save user RSP
+        mov rsp, [gs:0]         ; Switch to kernel stack
+
+        push 0                  ; SS
+        push rdx                ; User stack
+        push r11                ; RFLAGS
+        push 0                  ; CS
+        push rcx                ; Return address
+        push 0                  ; Dummy error code
+        PUSH_ALL                ; Save user context
 
         ;; Call handler
         shl rax, 3
@@ -55,16 +58,15 @@ _syscall:
         ;; Preserve RAX from here on, as it contains return code
 
         ;; Swap caller RAX for return code
-        pop r11                 ; CR3
-        pop r10                 ; RAX
-        push rax                ; New RAX
-        push r11                ; CR3
-        ;; Restore user context
-        POP_ALL
-        ;; Restore user stack
-        pop rsp
-        ;; Restore return address
+        mov qword [rsp + 24], rax
+
+        POP_ALL                 ;Restore user context
+        add rsp, 8
         pop rcx
+        add rsp, 8
+        pop r11
+        pop rsp
+
         swapgs
 
         o64 sysret
