@@ -26,8 +26,9 @@
 */
 #include "arch/smp.h"
 #include "arch/interrupt.h"
-#include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/apic.h"
+#include "arch/x86-64/context.h"
+#include "arch/x86-64/interrupt.h"
 #include "global.h"
 
 #define EARLY_KERNEL_CS 0x18
@@ -39,20 +40,20 @@ ARC_IDTRegister idt_register = {
 };
 
 int init_arch_early() {
-	internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
-	interrupt_load(&idt_register);
-	// NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
-	//       provide an OK one to use. Only during APIC initialization does a
-	//       GDT really need to get created
+        internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
+        interrupt_load(&idt_register);
+        // NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
+        //       provide an OK one to use. Only during APIC initialization does a
+        //       GDT really need to get created
 
-	return 0;
+        return 0;
 }
 
 int init_arch() {
         if (init_apic() != 0) {
-		ARC_DEBUG(ERR, "Failed to initialize interrupts\n");
-		ARC_HANG;
-	}
+                ARC_DEBUG(ERR, "Failed to initialize interrupts\n");
+                ARC_HANG;
+        }
 
-	return 0;
+        return 0;
 }
