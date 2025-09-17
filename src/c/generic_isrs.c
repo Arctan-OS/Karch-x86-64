@@ -44,7 +44,6 @@
         (void)processor_id;                                             \
 
 #define GENERIC_EXCEPTION_REG_DUMP(_vector) \
-        spinlock_lock(&panic_lock);                                     \
         printf("Received Interrupt %d (%s) from LAPIC %d\n", _vector,   \
                exception_names[_vector], processor_id);                 \
         printf("RAX: 0x%016" PRIx64 "\n", frame->gpr.rax);                   \
@@ -53,7 +52,7 @@
         printf("RDX: 0x%016" PRIx64 "\n", frame->gpr.rdx);                   \
         printf("RSI: 0x%016" PRIx64 "\n", frame->gpr.rsi);                   \
         printf("RDI: 0x%016" PRIx64 "\n", frame->gpr.rdi);                   \
-        printf("RSP: 0x%016" PRIx64 "\tSS: 0x%" PRIx64 "\n", frame->gpr.rsp,         \
+        printf("RSP: 0x%016" PRIx64 "\tSS: 0x%" PRIx64 "\n", frame->rsp,         \
                frame->ss);                                    \
         printf("RBP: 0x%016" PRIx64 "\n", frame->gpr.rbp);                   \
         printf("R8 : 0x%016" PRIx64 "\n", frame->gpr.r8);                    \
