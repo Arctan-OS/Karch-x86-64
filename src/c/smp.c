@@ -36,9 +36,12 @@
 #include "arch/x86-64/gdt.h"
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/smp.h"
+#include "arch/x86-64/sse.h"
+#include "arch/x86-64/util.h"
 #include "lib/util.h"
 #include "mm/allocator.h"
 #include "mm/pmm.h"
+#include "mp/scheduler.h"
 #include "util.h"
 #include "global.h"
 
@@ -81,7 +84,7 @@ void smp_hold() {
 }
 
 static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
- 	int id = init_lapic();
+ 	init_lapic();
 
 	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
 	context_set_proc_desc(current);
@@ -125,6 +128,10 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 		lapic_calibrate_timer();
 	}
 
+	interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
+
+	init_sse();
+
 	Arc_ProcessorCounter++;
 
 	__asm__("swapgs");
@@ -146,7 +153,8 @@ static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 	//       should be executing this code at a time
 	smp_register_ap(info->acpi_uid, info->acpi_flags);
 
-	ARC_ENABLE_INTERRUPT;
+	ARC_DISABLE_INTERRUPT;
+//	ARC_ENABLE_INTERRUPT;
 
 	info->flags |= 1 << ARC_AP_INFO_FLAGS_LM;
 
