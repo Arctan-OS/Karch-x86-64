@@ -25,6 +25,7 @@
  * @DESCRIPTION
 */
 #include "arch/interrupt.h"
+#include "arch/x86-64/apic/local.h"
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/context.h"
 #include "arch/x86-64/util.h"
@@ -80,6 +81,10 @@ int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_InterruptF
 extern int _install_idt(void *);
 int interrupt_load(void *handle) {
 	return _install_idt(handle);
+}
+
+void interrupt_end() {
+	lapic_eoi();
 }
 
 void *init_dynamic_interrupts(int count) {
