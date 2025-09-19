@@ -24,6 +24,7 @@
  *
  * @DESCRIPTION
 */
+#include "arch/x86-64/config.h"
 #include "arctan.h"
 #include "config.h"
 #include <arch/pager.h>
@@ -202,6 +203,8 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	if (info == NULL || info->dest_table == NULL) {
 		return -1;
 	}
+
+	info->size = ALIGN_UP(info->size, PAGE_SIZE);
 
 	while (info->size) {
 		uint8_t can_gib = ((Arc_KernelMeta->paging_features >> ARC_PAGER_FLAG_1_GIB) & 1)
