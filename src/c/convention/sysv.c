@@ -50,6 +50,7 @@
 
 int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
         uint64_t *rsp = (uint64_t *)thread->pstack + thread->stack_size - 16;
+        uint64_t *rbp = rsp;
 
         if (rsp == NULL) {
                 return -1;
@@ -107,7 +108,7 @@ int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char 
 
         STACK_PUSH(rsp, argc);
 
-        thread->context->frame.rsp -= (uintptr_t)thread->pstack - (uintptr_t)rsp;
+        thread->context->frame.rsp -= (uintptr_t)rbp - (uintptr_t)rsp;
 
         return 0;
 }
