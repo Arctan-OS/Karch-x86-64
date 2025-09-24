@@ -32,12 +32,14 @@
 #include "global.h"
 #include "mm/allocator.h"
 
-#define FS_BASE_MSR  0xC0000000
+#define FS_BASE_MSR  0xC0000100
 #define GS_BASE_MSR  0xC0000101
 #define KGS_BASE_MSR 0xC0000102
 
 void context_set_tcb(ARC_Context *ctx, void *tcb) {
-        _x86_WRMSR(GS_BASE_MSR, (uintptr_t)tcb);
+        __asm__("swapgs");
+        _x86_WRMSR(FS_BASE_MSR, (uintptr_t)tcb);
+        __asm__("swapgs");
         ctx->tcb = tcb;
 }
 
