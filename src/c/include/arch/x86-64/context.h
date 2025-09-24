@@ -56,7 +56,7 @@
         asm("pop r15;\
         mov cr0, r15; \
         pop r15; \
-        mov cr3, r15; \
+        mov cr3, r15;\
         pop r15; \
         mov cr4, r15; \
         pop rax; \
