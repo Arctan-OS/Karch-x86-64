@@ -40,6 +40,7 @@ _syscall:
 
         mov rdx, rsp            ; Save user RSP
         mov rsp, [gs:0]         ; Switch to kernel stack
+        add rsp, 0x2000 - 16
 
         push 0                  ; SS
         push rdx                ; User stack
@@ -49,15 +50,13 @@ _syscall:
         push 0                  ; Dummy error code
         PUSH_ALL                ; Save user context
 
-        ;; Call handler
+        ;; Figure out what handler to call
         shl rax, 3
         mov r12, Arc_SyscallTable
         add rax, r12
+
+        ;; Invoke handler, set caller's return code
         call [rax]
-
-        ;; Preserve RAX from here on, as it contains return code
-
-        ;; Swap caller RAX for return code
         mov qword [rsp + 24], rax
 
         POP_ALL                 ;Restore user context

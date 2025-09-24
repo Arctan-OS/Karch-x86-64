@@ -30,12 +30,19 @@
 #define ARC_ARCH_X86_64_SMP_H
 
 #include "arch/smp.h"
+#include "arch/x86-64/gdt.h"
+#include "arch/x86-64/interrupt.h"
 
 // TODO: This structure can be changed such that there is no need for syscall_stack
 //       by making it so that the KernelGS pointer points to the stack, and on the stack
 //       is this structure. This would also eliminate the need for a processor descriptor list.
 typedef struct ARC_x64ProcessorDescriptor {
         uintptr_t syscall_stack;
+        uintptr_t rsp0;
+        uintptr_t ist1;
+        ARC_GDTRegister *gdtr;
+        ARC_IDTRegister *idtr;
+        ARC_TSSDescriptor *tss;
         ARC_ProcessorDescriptor *descriptor;
 } __attribute__((packed)) ARC_x64ProcessorDescriptor;
 

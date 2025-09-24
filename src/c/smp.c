@@ -38,6 +38,7 @@
 #include "arch/x86-64/smp.h"
 #include "arch/x86-64/sse.h"
 #include "arch/x86-64/util.h"
+#include "config.h"
 #include "lib/util.h"
 #include "mm/allocator.h"
 #include "mm/pmm.h"
@@ -109,7 +110,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	uintptr_t ist1 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 	uintptr_t rsp0 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 
-	ARC_TSSDescriptor *tss = init_tss(ist1, rsp0);
+	ARC_TSSDescriptor *tss = init_tss(ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16);
 	ARC_GDTRegister *gdtr = init_gdt();
 	gdt_load(gdtr);
 	gdt_use_tss(gdtr, tss);
@@ -117,6 +118,13 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	ARC_IDTRegister *idtr = init_dynamic_interrupts(256);
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
 	interrupt_load(idtr);
+
+	current->ist1 = ist1;
+	current->rsp0 = rsp0;
+	current->tss = tss;
+	current->gdtr = gdtr;
+	current->idtr = idtr;
+	current->syscall_stack = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 
 	init_syscall();
 
@@ -171,6 +179,7 @@ struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
 		// NULL
 		return NULL;
 	}
+
 	return Arc_CurProcessorDescriptor->descriptor;
 }
 
@@ -181,6 +190,29 @@ uint32_t smp_get_processor_id() {
 void smp_switch_to(ARC_Context *ctx) {
 	(void)ctx;
 	ARC_DEBUG(WARN, "Definitely doing context switch\n");
+}
+
+// TODO: It would be better to construct a sort of container structure
+//       that could be mapped in at once without having overlapping
+//       sections and mixing with the general purpose kernel alloc-
+//       ator
+// TODO: This will be useful for KPTI.
+int smp_map_processor_structures(void *page_tables) {
+	pager_map(page_tables, (uintptr_t)Arc_ProcessorList, ARC_HHDM_TO_PHYS(Arc_ProcessorList), sizeof(*Arc_ProcessorList) * Arc_ProcessorCounter, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+
+	for (uint32_t i = 0; i < Arc_ProcessorCounter; i++) {
+		ARC_x64ProcessorDescriptor desc = Arc_ProcessorList[i];
+		pager_map(page_tables, (uintptr_t)desc.ist1, ARC_HHDM_TO_PHYS(desc.ist1), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.rsp0, ARC_HHDM_TO_PHYS(desc.rsp0), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.syscall_stack, ARC_HHDM_TO_PHYS(desc.syscall_stack), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.gdtr, ARC_HHDM_TO_PHYS(desc.gdtr), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.idtr->base, ARC_HHDM_TO_PHYS(desc.idtr->base), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.descriptor, ARC_HHDM_TO_PHYS(desc.descriptor), sizeof(*desc.descriptor), 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+
+		ARC_DEBUG(INFO, "Cloned mappings for processor-specific structures to table %p for processor %d\n", page_tables, i);
+	}
+
+	return 0;
 }
 
 // NOTE: This function is only called from the BSP
