@@ -51,6 +51,8 @@
 #define ONE_GIB 0x40000000
 #define TWO_MIB 0x200000
 
+uintptr_t Arc_KernelPageTables = 0;
+
 struct pager_traverse_info {
 	uint64_t *src_table; // Source page tables
 	uint64_t *dest_table; // Destination page tables
