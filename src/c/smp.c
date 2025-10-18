@@ -89,7 +89,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
  	init_lapic();
 
 	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
-	context_set_proc_desc(current);
+
 
 	if (Arc_ProcessorCounter == 0) {
 		Arc_BootProcessor = current;
@@ -113,8 +113,10 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	ARC_TSSDescriptor *tss = init_tss(ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16);
 	ARC_GDTRegister *gdtr = init_gdt();
-	gdt_load(gdtr);
+	gdt_load(gdtr); // This will reset GSBase
 	gdt_use_tss(gdtr, tss);
+
+	context_set_proc_desc(current);
 
 	ARC_IDTRegister *idtr = init_dynamic_interrupts(256);
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
@@ -143,8 +145,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	init_pcid();
 
 	Arc_ProcessorCounter++;
-
-	__asm__("swapgs");
 
 	desc->flags |= 1 << ARC_SMP_FLAGS_INIT;
 

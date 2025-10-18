@@ -48,7 +48,7 @@ void *context_get_tcb(ARC_Context *ctx) {
 }
 
 void context_set_proc_desc(ARC_x64ProcessorDescriptor *desc) {
-        _x86_WRMSR(KGS_BASE_MSR, (uintptr_t)desc);
+        _x86_WRMSR(GS_BASE_MSR, (uintptr_t)desc);
 }
 
 int uninit_context(ARC_Context *context) {
