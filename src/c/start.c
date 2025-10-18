@@ -24,14 +24,12 @@
  *
  * @DESCRIPTION
 */
-#include "arch/smp.h"
 #include "arch/interrupt.h"
 #include "arch/pager.h"
 #include "arch/x86-64/apic.h"
 #include "arch/x86-64/ctrl_regs.h"
-#include "arch/x86-64/context.h"
 #include "arch/x86-64/interrupt.h"
-#include "global.h"
+#include "util.h"
 
 #define EARLY_KERNEL_CS 0x18
 
