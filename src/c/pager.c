@@ -25,13 +25,18 @@
  * @DESCRIPTION
 */
 #include "arch/x86-64/config.h"
+#include "arch/x86-64/smp.h"
 #include "arctan.h"
 #include "config.h"
+#include "lib/atomics.h"
+#include "mm/allocator.h"
+#include "util.h"
 #include <arch/pager.h>
 #include <arch/x86-64/ctrl_regs.h>
 #include <mm/pmm.h>
 #include <global.h>
 #include <lib/util.h>
+#include <stdint.h>
 
 // NOTE: The pager does not overwrite the priveleges of a directory table.
 //       So if a directory table is kernel only, and a userspace page is mapped
@@ -42,12 +47,6 @@
 //       Find out if other functions do this too, or if it just this one and fix it.
 
 #define ADDRESS_MASK 0x000FFFFFFFFFF000
-// Flags for Arc_BootMeta->paging_features
-#define FLAGS_NO_EXEC (1 << 0)
-// NOTE: Since PML4 is used 2MiB pages
-//       ought to be supported (I have not
-//       found a way to test for them)
-#define FLAGS_1GIB (1 << 1)
 
 #define ONE_GIB 0x40000000
 #define TWO_MIB 0x200000
@@ -65,8 +64,6 @@ struct pager_traverse_info {
 	uint32_t pml2e;
 	uint32_t pml1e;
 };
-
-uintptr_t Arc_KernelPageTables = 0;
 
 uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	// Level 0: Page
@@ -215,7 +212,9 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 		MASKED_WRITE(info->attributes, can_gib, ARC_PAGER_RESV0, 1);
 		MASKED_WRITE(info->attributes, can_2mib, ARC_PAGER_RESV1, 1);
 
-		uint64_t *table = info->dest_table; // PML4
+		uint64_t *table = (uint64_t *)ALIGN_DOWN(info->dest_table, PAGE_SIZE); // PML4
+										       // Align down is used to cut out
+										       // the PCID
 		int index = get_page_table(table, 4, info->virtual, info->attributes); // index in PML4
 
 		if (index == -1) {
@@ -557,7 +556,6 @@ uintptr_t pager_switch_to_kpages() {
 }
 
 int init_pager() {
-	Arc_KernelPageTables = _x86_getCR3();
 	ARC_DEBUG(INFO, "Initialized pager\n");
 
 	return 0;

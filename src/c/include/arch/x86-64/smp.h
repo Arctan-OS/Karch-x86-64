@@ -44,6 +44,10 @@ typedef struct ARC_x64ProcessorDescriptor {
         ARC_IDTRegister *idtr;
         ARC_TSSDescriptor *tss;
         ARC_ProcessorDescriptor *descriptor;
+        struct {
+                uint64_t *bmp;
+                int last_free;
+        } pcid;
 } __attribute__((packed)) ARC_x64ProcessorDescriptor;
 
 // NOTE: The index in Arc_ProcessorList corresponds to the ID

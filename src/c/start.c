@@ -26,7 +26,9 @@
 */
 #include "arch/smp.h"
 #include "arch/interrupt.h"
+#include "arch/pager.h"
 #include "arch/x86-64/apic.h"
+#include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/context.h"
 #include "arch/x86-64/interrupt.h"
 #include "global.h"
@@ -40,6 +42,8 @@ ARC_IDTRegister idt_register = {
 };
 
 int init_arch_early() {
+        Arc_KernelPageTables = _x86_getCR3();
+
         internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
         interrupt_load(&idt_register);
         // NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
