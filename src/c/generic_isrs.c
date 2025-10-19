@@ -38,10 +38,9 @@
 
 #define GENERIC_HANDLER(_vector)                                        \
         extern void _idt_stub_##_vector();                              \
-        void generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
+        void USERSPACE generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
 
 #define GENERIC_HANDLER_PREAMBLE                               \
-        pager_switch_to_kpages();                                       \
         int processor_id = lapic_get_id();                              \
         (void)processor_id;                                             \
 
@@ -223,6 +222,14 @@ GENERIC_HANDLER(14) {
 	GENERIC_HANDLER_PREAMBLE;
         uintptr_t vaddr = _x86_getCR2();
 
+        GENERIC_EXCEPTION_REG_DUMP(14);
+        printf("CR2: 0x%016"PRIx64"\n", vaddr);
+        printf("CR3: 0x%016"PRIx64"\n", frame->gpr.cr3);
+        spinlock_unlock(&panic_lock);
+        GENERIC_HANDLER_POSTAMBLE;
+        ARC_HANG;
+
+/*
         if (frame->cs == 0x8 && frame->gpr.cr3 != Arc_KernelPageTables) {
                 uintptr_t paddr = vaddr;
 
@@ -232,14 +239,8 @@ GENERIC_HANDLER(14) {
                 printf("%p %p %p\n", frame->rip, vaddr, paddr);
                 //pager_map((void *)ARC_PHYS_TO_HHDM(frame->gpr.cr3), vaddr, paddr, PAGE_SIZE, 1 << ARC_PAGER_RW);
         } else {
-                GENERIC_EXCEPTION_REG_DUMP(14);
-                printf("CR2: 0x%016"PRIx64"\n", vaddr);
-                printf("CR3: 0x%016"PRIx64"\n", frame->gpr.cr3);
-                spinlock_unlock(&panic_lock);
-                GENERIC_HANDLER_POSTAMBLE;
-                ARC_HANG;
-        }
-
+                }
+*/
         GENERIC_HANDLER_POSTAMBLE;
 }
 

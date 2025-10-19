@@ -27,6 +27,7 @@
 */
 %endif
 bits 64
+section .text
 
 global _install_idt
 extern idtr
@@ -37,10 +38,10 @@ _install_idt:
 
 %include "src/asm/context.asm"
 
-extern Arc_KernelPageTables
 
 %macro common_idt_stub 1
-section .text
+section .userspace
+extern Arc_KernelPageTables
 global _idt_stub_%1
 extern generic_interrupt_handler_%1
 _idt_stub_%1:
@@ -62,6 +63,10 @@ _idt_stub_%1:
 
         mov ax, 0x10
         mov ss, ax
+
+        lea rax, [rel Arc_KernelPageTables]
+        mov rax, [rax]
+        mov cr3, rax
 
         call generic_interrupt_handler_%1
 
