@@ -24,6 +24,8 @@
  *
  * @DESCRIPTION
 */
+#include "arch/x86-64/smp.h"
+#include "config.h"
 #include <arch/io/port.h>
 #include <mm/pmm.h>
 #include <global.h>
@@ -32,6 +34,10 @@
 #include <mp/scheduler.h>
 #include <arch/smp.h>
 #include <stdint.h>
+
+uintptr_t USERSPACE syscall_get_kpages() {
+	return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor->process->page_tables.kernel);
+}
 
 extern int _syscall();
 int init_syscall() {

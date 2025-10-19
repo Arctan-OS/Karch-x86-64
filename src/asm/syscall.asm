@@ -28,13 +28,14 @@
 %endif
 
 bits 64
-section .text
+section .userspace
 
 %include "src/asm/context.asm"
 
 global _syscall
 extern Arc_SyscallTable
 extern Arc_KernelPageTables
+extern syscall_get_kpages
 _syscall:
         swapgs
 
@@ -49,6 +50,18 @@ _syscall:
         push rcx                ; Return address
         push 0                  ; Dummy error code
         PUSH_ALL                ; Save user context
+
+        ;; TODO: Would be nice to get rid of this call
+        ;;       such that it could just be:
+        ;;       mov rax, [gs:<offset of descriptor pointer>]
+        ;;       mov rax, [rax:<offset of process pointer>]
+        ;;       mov rax, [rax:<offset of page_tables.kernel>]
+        ;;       Problem: don't know those offsets, and don't
+        ;;       know how to get them
+        push rax
+        call syscall_get_kpages
+        mov cr3, rax
+        pop rax
 
         ;; Figure out what handler to call
         shl rax, 3
