@@ -25,6 +25,7 @@
  * @DESCRIPTION
 */
 #include "arch/x86-64/config.h"
+#include "arch/x86-64/pcid.h"
 #include "arch/x86-64/smp.h"
 #include "arctan.h"
 #include "config.h"
@@ -51,7 +52,7 @@
 #define ONE_GIB 0x40000000
 #define TWO_MIB 0x200000
 
-uintptr_t Arc_KernelPageTables = 0;
+uintptr_t USERSPACE Arc_KernelPageTables = 0;
 
 struct pager_traverse_info {
 	uint64_t *src_table; // Source page tables
@@ -292,6 +293,13 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 }
 
 void *pager_create_page_tables() {
+	int pcid = pcid_allocate();
+
+	if (pcid < 0) {
+		ARC_DEBUG(ERR, "Failed to allocate PCID\n");
+		return NULL;
+	}
+
 	void *tables = pmm_fast_page_alloc();
 
 	if (tables == NULL) {
@@ -300,7 +308,7 @@ void *pager_create_page_tables() {
 
 	memset(tables, 0, PAGE_SIZE);
 
-	return tables;
+	return (void *)((uintptr_t)tables | pcid);
 }
 
 static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {
@@ -548,13 +556,6 @@ int pager_clone(void *_page_tables, uintptr_t virt_src, uintptr_t virt_dest, siz
 	}
 
 	return 0;
-}
-
-uintptr_t pager_switch_to_kpages() {
-	uintptr_t old_page_tables = _x86_getCR3();
-	_x86_setCR3(Arc_KernelPageTables);
-
-	return old_page_tables;
 }
 
 int init_pager() {
