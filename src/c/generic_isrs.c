@@ -30,6 +30,7 @@
 #include "arch/pager.h"
 #include "arch/x86-64/apic/local.h"
 #include "arch/x86-64/context.h"
+#include "arch/x86-64/smp.h"
 #include "arch/x86-64/util.h"
 #include "config.h"
 #include "global.h"
@@ -222,25 +223,25 @@ GENERIC_HANDLER(14) {
 	GENERIC_HANDLER_PREAMBLE;
         uintptr_t vaddr = _x86_getCR2();
 
-        GENERIC_EXCEPTION_REG_DUMP(14);
-        printf("CR2: 0x%016"PRIx64"\n", vaddr);
-        printf("CR3: 0x%016"PRIx64"\n", frame->gpr.cr3);
-        spinlock_unlock(&panic_lock);
-        GENERIC_HANDLER_POSTAMBLE;
-        ARC_HANG;
-
-/*
-        if (frame->cs == 0x8 && frame->gpr.cr3 != Arc_KernelPageTables) {
+        ARC_Thread *current = Arc_CurProcessorDescriptor->descriptor->thread;
+        uintptr_t page_tables = (uintptr_t)current->parent->page_tables.kernel;
+        if (frame->cs == 0x8 && frame->gpr.cr3 == ARC_HHDM_TO_PHYS(page_tables)) {
                 uintptr_t paddr = vaddr;
 
                 if (vaddr >= ARC_HHDM_VADDR) {
                         paddr = ARC_HHDM_TO_PHYS(vaddr);
                 }
-                printf("%p %p %p\n", frame->rip, vaddr, paddr);
-                //pager_map((void *)ARC_PHYS_TO_HHDM(frame->gpr.cr3), vaddr, paddr, PAGE_SIZE, 1 << ARC_PAGER_RW);
+
+                pager_map((void *)page_tables, vaddr, paddr, PAGE_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
         } else {
-                }
-*/
+                GENERIC_EXCEPTION_REG_DUMP(14);
+                printf("CR2: 0x%016"PRIx64"\n", vaddr);
+                printf("CR3: 0x%016"PRIx64"\n", frame->gpr.cr3);
+                spinlock_unlock(&panic_lock);
+                GENERIC_HANDLER_POSTAMBLE;
+                ARC_HANG;
+        }
+
         GENERIC_HANDLER_POSTAMBLE;
 }
 
