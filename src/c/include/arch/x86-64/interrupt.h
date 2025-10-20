@@ -36,17 +36,19 @@
 
 // NOTE: This function will automatically push an additional value (0) to the stack to
 //       take the place of an error code such that the interrupt frame structure does
-//       not have to change
+//       not have to change.
 //
-//       This should be used for interrupt vectors 8, 10, 12, 13, 14, 17, and 21; all
-//       other vectors, including all IRQs from 32 to 255 should be fine to use this
-//       macro
-#define ARC_DEFINE_IRQ_HANDLER(_handler) \
+//       This handler is intended for use on IRQs (interrupt vectors >= 32), but may be
+//       used also for vectors below 32 but: 8, 10, 12, 13, 14, 17, and 21.
+//
+// NOTE: _page_tables, and the path to dereference it, must be marked as USERSPACE.
+#define ARC_DEFINE_IRQ_HANDLER(_handler, _page_tables) \
         void __attribute__((naked)) USERSPACE ARC_NAME_IRQ(_handler)() { \
                 __asm__("push 0"); \
                 ARC_ASM_PUSH_ALL \
                 __asm__("mov ax, 0x10; mov ss, ax"); \
                 __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
+                __asm__("mov rax, [rax]; mov cr3, rax" :: "a"(&_page_tables) :); \
                 __asm__("mov rdi, rsp; call %0" :: "i"(_handler) :); \
                 __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
                 ARC_ASM_POP_ALL \
