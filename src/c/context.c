@@ -29,6 +29,7 @@
 #include "arch/x86-64/context.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/smp.h"
+#include "arch/x86-64/sse.h"
 #include "global.h"
 #include "mm/allocator.h"
 
@@ -72,15 +73,15 @@ ARC_Context *init_context(uint64_t flags) {
 
         memset(ret, 0, sizeof(*ret));
 
-        void *fxsave_space = alloc(512);
+        if (MASKED_READ(flags, ARC_CONTEXT_FLAG_FLOATS, 1)) {
+                ret->frame.gpr.cr0 = _x86_getCR0();
+                ret->frame.gpr.cr4 = _x86_getCR4();
 
-        if (fxsave_space == NULL) {
-                ARC_DEBUG(ERR, "Failed to allocate fxsave space\n");
+                if (init_sse(ret) != 0) {
+                        free(ret);
+                        return NULL;
+                }
         }
-
-        memset(fxsave_space, 0, 512);
-
-        ret->fxsave_space = fxsave_space;
 
         return ret;
 }

@@ -27,6 +27,8 @@
 #ifndef ARC_ARCH_X86_64_SSE_H
 #define ARC_ARCH_X86_64_SSE_H
 
-int init_sse();
+#include "arch/x86-64/context.h"
+
+int init_sse(ARC_Context * context);
 
 #endif

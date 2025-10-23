@@ -26,6 +26,7 @@
  * Called by CPUID to enable support for SSE.
 */
 
+#include "arch/x86-64/context.h"
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
 #include <cpuid.h>
@@ -37,7 +38,7 @@
 //       allow for the saving and restoring of many other bits of data other than just
 //       floating point data. For now though, fxsave/rstor are used.
 
-int init_sse() {
+int init_sse(ARC_Context * context) {
 	register uint32_t eax;
 	register uint32_t ebx;
 	register uint32_t ecx;
@@ -56,20 +57,22 @@ int init_sse() {
 		return -2;
 	}
 
-	uint64_t cr0 = _x86_getCR0();
-	uint64_t cr4 = _x86_getCR4();
+	void *fxsave_space = alloc(512);
 
-	cr0 &= ~(1 << 2); // Disable x87 FPU emulation
-	cr0 |= (1 << 1);
+        if (fxsave_space == NULL) {
+                ARC_DEBUG(ERR, "Failed to allocate fxsave space\n");
+		return -3;
+        }
 
-	cr4 |= (1 << 9); // OSFXSR
-	cr4 |= (1 << 10); // OSXMMEXCPT
+        memset(fxsave_space, 0, 512);
 
-	_x86_setCR0(cr0);
-	_x86_setCR4(cr4);
+        context->fxsave_space = fxsave_space;
 
-	// NOTE: An fxsave space is not set here but rather later in contexts.
-	//       This is because the kernel itself does not use SSE.
+	context->frame.gpr.cr0 &= ~(1 << 2); // Disable x87 FPU emulation
+	context->frame.gpr.cr0 |= (1 << 1);
+
+	context->frame.gpr.cr4 |= (1 << 9); // OSFXSR
+	context->frame.gpr.cr4 |= (1 << 10); // OSXMMEXCPT
 
 	ARC_DEBUG(INFO, "Initalized SSE\n");
 

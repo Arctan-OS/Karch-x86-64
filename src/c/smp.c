@@ -37,7 +37,6 @@
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/pcid.h"
 #include "arch/x86-64/smp.h"
-#include "arch/x86-64/sse.h"
 #include "arch/x86-64/util.h"
 #include "config.h"
 #include "lib/util.h"
@@ -141,7 +140,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 
-	init_sse();
 	init_pcid();
 
 	Arc_ProcessorCounter++;
