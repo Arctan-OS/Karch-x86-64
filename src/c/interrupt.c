@@ -87,6 +87,19 @@ void interrupt_end() {
 	lapic_eoi();
 }
 
+int init_static_interrupts(void *table, void *entries, int count) {
+	if (table == NULL || entries == NULL || count == 0) {
+		ARC_DEBUG(ERR, "Invalid parameters\n");
+		return -1;
+	}
+
+	ARC_IDTRegister *idtr = table;
+	idtr->base = (uintptr_t)entries;
+	idtr->limit = sizeof(ARC_IDTEntry) * count - 1;
+
+	return 0;
+}
+
 void *init_dynamic_interrupts(int count) {
 	if (count < 32) {
 		return NULL;
@@ -107,8 +120,9 @@ void *init_dynamic_interrupts(int count) {
 
 	memset(entries, 0, sizeof(ARC_IDTEntry) * count);
 
-	reg->base = (uintptr_t)entries;
-	reg->limit = sizeof(ARC_IDTEntry) * count - 1;
+	if (init_static_interrupts(reg, entries, count) != 0) {
+		free(reg);
+	}
 
 	return reg;
 }
