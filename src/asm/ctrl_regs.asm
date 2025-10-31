@@ -27,9 +27,9 @@
 */
 %endif
 bits 64
+section .text
 
-section .userspace
-%macro GET_DATA 2
+%macro GET_DATA 1
 global _x86_get%1
 _x86_get%1:
     mov rax, %1
@@ -52,8 +52,7 @@ _x86_RDMSR:
         or rax, rdx
         ret
 
-section .text
-%macro SET_DATA 2
+%macro SET_DATA 1
 global _x86_set%1
 _x86_set%1:
     mov rax, rdi
