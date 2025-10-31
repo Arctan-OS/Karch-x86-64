@@ -25,6 +25,7 @@
  * @DESCRIPTION
 */
 #include "arch/smp.h"
+#include "arch/x86-64/config.h"
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/pager.h"
@@ -36,10 +37,11 @@
 #include "global.h"
 #include "interface/printf.h"
 #include "lib/spinlock.h"
+#include "userspace/process.h"
 
 #define GENERIC_HANDLER(_vector)                                        \
         extern void _idt_stub_##_vector();                              \
-        void USERSPACE generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
+        USERSPACE(text) void generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
 
 #define GENERIC_HANDLER_PREAMBLE                               \
         int processor_id = lapic_get_id();                              \
@@ -223,17 +225,27 @@ GENERIC_HANDLER(14) {
 	GENERIC_HANDLER_PREAMBLE;
         uintptr_t vaddr = _x86_getCR2();
 
-        ARC_Thread *current = Arc_CurProcessorDescriptor->descriptor->thread;
-        uintptr_t page_tables = (uintptr_t)current->parent->page_tables.kernel;
-        if (frame->cs == 0x8 && frame->gpr.cr3 == ARC_HHDM_TO_PHYS(page_tables)) {
-                uintptr_t paddr = vaddr;
+        ARC_Process *process = Arc_CurProcessorDescriptor->descriptor.process;
+        uintptr_t kernel = process == NULL ? 0 : (uintptr_t)process->page_tables.kernel;
+        uintptr_t user   = process == NULL ? 0 : (uintptr_t)process->page_tables.user;
 
-                if (vaddr >= ARC_HHDM_VADDR) {
-                        paddr = ARC_HHDM_TO_PHYS(vaddr);
+        if (frame->cs == 0x8 && frame->gpr.cr3 == ARC_HHDM_TO_PHYS(kernel)) {
+                int r = 0;
+
+                if (vaddr >= ARC_HHDM_VADDR && vaddr <= (uintptr_t)&__KERNEL_START__) {
+                        r = pager_map((void *)kernel, vaddr, ARC_HHDM_TO_PHYS(vaddr),
+                                  PAGE_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+                } else if (vaddr <= ARC_HHDM_VADDR) {
+                        r = pager_clone((void *)kernel, (void *)user, vaddr, vaddr, PAGE_SIZE);
                 }
 
-                pager_map((void *)page_tables, vaddr, paddr, PAGE_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+                if (r != 0) {
+                        // Failed to map in the pages
+                        // TODO: Terminate the process
+                        goto panic;
+                }
         } else {
+                panic:;
                 GENERIC_EXCEPTION_REG_DUMP(14);
                 printf("CR2: 0x%016"PRIx64"\n", vaddr);
                 printf("CR3: 0x%016"PRIx64"\n", frame->gpr.cr3);
