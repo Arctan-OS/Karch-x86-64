@@ -25,6 +25,7 @@
  * @DESCRIPTION
 */
 #include "arch/interrupt.h"
+#include "arch/info.h"
 #include "arch/x86-64/apic/local.h"
 #include "arch/x86-64/interrupt.h"
 #include "arch/x86-64/context.h"
@@ -64,6 +65,7 @@ int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_InterruptF
 
 	entries = (ARC_IDTEntry *)reg->base;
 
+	bool I = arch_interrupts_enabled();
 	ARC_DISABLE_INTERRUPT;
 
 	if (function == NULL) {
@@ -72,8 +74,9 @@ int interrupt_set(void *handle, uint32_t number, void (*function)(ARC_InterruptF
 		install_idt_gate(&entries[number], (uintptr_t)function, kernel ? KERNEL_CS : USER_CS, 0x8E, 1 - !kernel);
 	}
 
-	// TODO: Make a way to save RFLAGS prior to disabling interrupts and
-	//       then restore those values here
+	if (I) {
+		ARC_ENABLE_INTERRUPT;
+	}
 
 	return 0;
 }
