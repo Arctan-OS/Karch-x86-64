@@ -27,58 +27,20 @@
 */
 %endif
 bits 64
-section .text
 
+section .userspace
 %macro GET_DATA 2
-    mov rax, %2
+global _x86_get%1
+_x86_get%1:
+    mov rax, %1
     ret
 %endmacro
 
-%macro SET_DATA 2
-    mov rax, rdi
-    mov %2, rax
-    ret
-%endmacro
-
-global _x86_getCR0
-_x86_getCR0:
-        GET_DATA _x86_CR0, cr0
-
-global _x86_setCR0
-_x86_setCR0:
-        SET_DATA _x86_CR0, cr0
-
-global _x86_getCR1
-_x86_getCR1:
-        GET_DATA _x86_CR1, cr1
-
-global _x86_setCR1
-_x86_setCR1:
-        SET_DATA _x86_CR1, cr1
-
-global _x86_getCR2
-_x86_getCR2:
-        GET_DATA _x86_CR2, cr2
-
-global _x86_setCR2
-_x86_setCR2:
-        SET_DATA _x86_CR2, cr2
-
-global _x86_getCR3
-_x86_getCR3:
-        GET_DATA _x86_CR3, cr3
-
-global _x86_setCR3
-_x86_setCR3:
-        SET_DATA _x86_CR3, cr3
-
-global _x86_getCR4
-_x86_getCR4:
-        GET_DATA _x86_CR4, cr4
-
-global _x86_setCR4
-_x86_setCR4:
-        SET_DATA _x86_CR4, cr4
+GET_DATA CR0
+GET_DATA CR1
+GET_DATA CR2
+GET_DATA CR3
+GET_DATA CR4
 
 global _x86_RDMSR
 _x86_RDMSR:
@@ -89,6 +51,21 @@ _x86_RDMSR:
         rol rdx, 32
         or rax, rdx
         ret
+
+section .text
+%macro SET_DATA 2
+global _x86_set%1
+_x86_set%1:
+    mov rax, rdi
+    mov %1, rax
+    ret
+%endmacro
+
+SET_DATA CR0
+SET_DATA CR1
+SET_DATA CR2
+SET_DATA CR3
+SET_DATA CR4
 
 global _x86_WRMSR
 _x86_WRMSR:

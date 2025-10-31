@@ -43,7 +43,7 @@
 //
 // NOTE: _page_tables, and the path to dereference it, must be marked as USERSPACE.
 #define ARC_DEFINE_IRQ_HANDLER(_handler, _page_tables) \
-        void __attribute__((naked)) USERSPACE ARC_NAME_IRQ(_handler)() { \
+        void __attribute__((naked)) USERSPACE(text) ARC_NAME_IRQ(_handler)() { \
                 __asm__("push 0"); \
                 ARC_ASM_PUSH_ALL \
                 __asm__("mov ax, 0x10; mov ss, ax"); \
