@@ -77,8 +77,8 @@ extern uint8_t _AP_START_INFO;
 
 struct ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
 struct ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
-ARC_x64ProcessorDescriptor __seg_gs USERSPACE *Arc_CurProcessorDescriptor = NULL;
-uint32_t Arc_ProcessorCounter = 0;
+USERSPACE(bss) ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor = NULL;
+USERSPACE(bss) uint32_t Arc_ProcessorCounter = 0;
 
 void smp_hold() {
 	ARC_HANG;
@@ -89,20 +89,15 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
 
+	printf("Current proc desc: %p\n", current);
 
 	if (Arc_ProcessorCounter == 0) {
 		Arc_BootProcessor = current;
 	}
 
-	ARC_ProcessorDescriptor *desc = alloc(sizeof(*desc));
-	if (desc == NULL) {
-		ARC_DEBUG(ERR, "Failed to create processor descriptor\n");
-		ARC_HANG;
-	}
+	ARC_ProcessorDescriptor *desc = &current->descriptor;
 
 	memset(desc, 0, sizeof(*desc));
-
-	current->descriptor = desc;
 
 	desc->acpi_uid = acpi_uid;
 	desc->acpi_flags = acpi_flags;
@@ -110,25 +105,51 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	uintptr_t ist1 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 	uintptr_t rsp0 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 
-	ARC_TSSDescriptor *tss = init_tss(ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16);
-	ARC_GDTRegister *gdtr = init_gdt();
+	ARC_TSSDescriptor *tss = &current->proc_structs.tss;
+	ARC_GDTRegister *gdtr = &current->proc_structs.gdtr;
+
+
+	if (init_static_tss(tss, ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16) != 0) {
+		ARC_DEBUG(ERR, "Failed to create TSS\n");
+		ARC_HANG;
+	}
+
+	if (init_static_gdt(gdtr) != 0) {
+		ARC_DEBUG(ERR, "Failed to create GDT\n");
+		ARC_HANG;
+	}
+
 	gdt_load(gdtr); // This will reset GSBase
 	gdt_use_tss(gdtr, tss);
 
 	context_set_proc_desc(current);
+	context_set_proc_features();
 
-	ARC_IDTRegister *idtr = init_dynamic_interrupts(256);
+	ARC_IDTRegister *idtr = &current->proc_structs.idtr;
+	ARC_IDTEntry *entries = current->proc_structs.idt_entries;
+	const size_t entry_count = sizeof(current->proc_structs.idt_entries) / sizeof(ARC_IDTEntry);
+
+	if (init_static_interrupts(idtr, entries, entry_count) != 0) {
+		ARC_DEBUG(ERR, "Failed to create IDT\n");
+		ARC_HANG;
+	}
+
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
 	interrupt_load(idtr);
 
 	current->ist1 = ist1;
 	current->rsp0 = rsp0;
-	current->tss = tss;
-	current->gdtr = gdtr;
-	current->idtr = idtr;
 	current->syscall_stack = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 
-	init_syscall();
+	if (current->syscall_stack == 0) {
+		ARC_DEBUG(ERR, "Failed to allocate syscall stack\n");
+		ARC_HANG;
+	}
+
+	if (init_syscall() != 0) {
+		ARC_DEBUG(ERR, "Failed to initialize syscalls\n");
+		ARC_HANG;
+	}
 
 	if (Arc_ProcessorCounter == 0) {
 		lapic_setup_timer(32, ARC_LAPIC_TIMER_PERIODIC);
@@ -141,6 +162,8 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 
 	init_pcid();
+
+
 
 	Arc_ProcessorCounter++;
 
@@ -171,7 +194,7 @@ static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 	return 0;
 }
 
-struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
+USERSPACE(text) ARC_ProcessorDescriptor *smp_get_proc_desc() {
 	if (Arc_ProcessorCounter == 0) {
 		// No processors have been initialized yet into an SMP system,
 		// therefore it can be assumed that GS = 0. Accessing
@@ -180,7 +203,8 @@ struct ARC_ProcessorDescriptor *smp_get_proc_desc() {
 		return NULL;
 	}
 
-	return Arc_CurProcessorDescriptor->descriptor;
+	ARC_x64ProcessorDescriptor *desc = context_get_proc_desc();
+	return &desc->descriptor;
 }
 
 uint32_t smp_get_processor_id() {
@@ -200,14 +224,15 @@ void smp_switch_to(ARC_Context *ctx) {
 int smp_map_processor_structures(void *page_tables) {
 	pager_map(page_tables, (uintptr_t)Arc_ProcessorList, ARC_HHDM_TO_PHYS(Arc_ProcessorList), sizeof(*Arc_ProcessorList) * Arc_ProcessorCounter, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
 
+	const uint32_t flags = 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX;
+
 	for (uint32_t i = 0; i < Arc_ProcessorCounter; i++) {
 		ARC_x64ProcessorDescriptor desc = Arc_ProcessorList[i];
-		pager_map(page_tables, (uintptr_t)desc.ist1, ARC_HHDM_TO_PHYS(desc.ist1), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
-		pager_map(page_tables, (uintptr_t)desc.rsp0, ARC_HHDM_TO_PHYS(desc.rsp0), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
-		pager_map(page_tables, (uintptr_t)desc.syscall_stack, ARC_HHDM_TO_PHYS(desc.syscall_stack), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
-		pager_map(page_tables, (uintptr_t)desc.gdtr, ARC_HHDM_TO_PHYS(desc.gdtr), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
-		pager_map(page_tables, (uintptr_t)desc.idtr->base, ARC_HHDM_TO_PHYS(desc.idtr->base), ARC_STD_KSTACK_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
-		pager_map(page_tables, (uintptr_t)desc.descriptor, ARC_HHDM_TO_PHYS(desc.descriptor), sizeof(*desc.descriptor), 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
+		pager_map(page_tables, (uintptr_t)desc.ist1, ARC_HHDM_TO_PHYS(desc.ist1), ARC_STD_KSTACK_SIZE, flags);
+		pager_map(page_tables, (uintptr_t)desc.rsp0, ARC_HHDM_TO_PHYS(desc.rsp0), ARC_STD_KSTACK_SIZE, flags);
+		pager_map(page_tables, (uintptr_t)desc.syscall_stack, ARC_HHDM_TO_PHYS(desc.syscall_stack), ARC_STD_KSTACK_SIZE, flags);
+
+		pager_map(page_tables, (uintptr_t)&desc, ARC_HHDM_TO_PHYS(&desc), sizeof(desc), flags);
 
 		ARC_DEBUG(INFO, "Cloned mappings for processor-specific structures to table %p for processor %d\n", page_tables, i);
 	}

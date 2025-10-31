@@ -38,9 +38,7 @@
 #define KGS_BASE_MSR 0xC0000102
 
 void context_set_tcb(ARC_Context *ctx, void *tcb) {
-        __asm__("swapgs");
         _x86_WRMSR(FS_BASE_MSR, (uintptr_t)tcb);
-        __asm__("swapgs");
         ctx->tcb = tcb;
 }
 
@@ -52,6 +50,24 @@ void context_set_proc_desc(ARC_x64ProcessorDescriptor *desc) {
         _x86_WRMSR(GS_BASE_MSR, (uintptr_t)desc);
 }
 
+USERSPACE(text) ARC_x64ProcessorDescriptor *context_get_proc_desc() {
+        return (ARC_x64ProcessorDescriptor *)_x86_RDMSR(GS_BASE_MSR);
+}
+
+void context_save(ARC_Context *ctx, ARC_InterruptFrame *new) {
+        memcpy(&ctx->frame, new, sizeof(*new));
+        // NOTE: TCB does not need to be saved here, that is done in
+        //       context_set_tcb
+        // TODO: xsave
+
+}
+
+void context_load(ARC_Context *ctx, ARC_InterruptFrame *to) {
+        memcpy(to, &ctx->frame, sizeof(*to));
+        _x86_WRMSR(FS_BASE_MSR, (uintptr_t)ctx->tcb);
+        // TODO: xrstor
+}
+
 int uninit_context(ARC_Context *context) {
         if (context == NULL) {
                 return -1;
@@ -60,6 +76,10 @@ int uninit_context(ARC_Context *context) {
         free(context->fxsave_space);
         free(context);
 
+        return 0;
+}
+
+int context_set_proc_features() {
         return 0;
 }
 

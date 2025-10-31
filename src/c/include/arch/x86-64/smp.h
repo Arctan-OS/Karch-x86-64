@@ -40,15 +40,18 @@ typedef struct ARC_x64ProcessorDescriptor {
         uintptr_t syscall_stack;
         uintptr_t rsp0;
         uintptr_t ist1;
-        ARC_GDTRegister *gdtr;
-        ARC_IDTRegister *idtr;
-        ARC_TSSDescriptor *tss;
-        ARC_ProcessorDescriptor *descriptor;
+        ARC_ProcessorDescriptor descriptor;
         struct {
                 uint64_t *bmp;
                 int last_free;
         } pcid;
-} __attribute__((packed)) ARC_x64ProcessorDescriptor;
+        struct {
+                ARC_GDTRegister gdtr;
+                ARC_IDTRegister idtr;
+                ARC_IDTEntry idt_entries[256];
+                ARC_TSSDescriptor tss;
+        } proc_structs;
+} __attribute__((packed,aligned(PAGE_SIZE))) ARC_x64ProcessorDescriptor;
 
 // NOTE: The index in Arc_ProcessorList corresponds to the ID
 //       acquired from get_processor_id();
@@ -71,6 +74,8 @@ extern ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor;
  * @param ARC_x64ProcessorDescriptor *desc - The processor descriptor to set
  * */
 void context_set_proc_desc(ARC_x64ProcessorDescriptor *desc);
+
+ARC_x64ProcessorDescriptor *context_get_proc_desc();
 
 /**
  * Initialize an AP into an SMP system.
