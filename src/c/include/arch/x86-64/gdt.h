@@ -96,7 +96,9 @@ typedef struct ARC_GDTRegister {
 
 int gdt_load(ARC_GDTRegister *gdtr);
 int gdt_use_tss(ARC_GDTRegister *gdtr, ARC_TSSDescriptor *tss);
+int init_static_tss(ARC_TSSDescriptor *tss, uintptr_t ist1, uintptr_t rsp0);
 ARC_TSSDescriptor *init_tss(uintptr_t ist1, uintptr_t rsp0);
+int init_static_gdt(ARC_GDTRegister *gdtr);
 ARC_GDTRegister *init_gdt();
 
 #endif

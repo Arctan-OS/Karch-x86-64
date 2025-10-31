@@ -41,11 +41,7 @@ _install_gdt:
 _gdt_set_cs:
         ;; Set segments to 32/64-bit data offset
         mov ax, 0x10
-        mov ds, ax
-        mov fs, ax
-        mov gs, ax
         mov ss, ax
-        mov es, ax
         xor rax, rax
         ret
 

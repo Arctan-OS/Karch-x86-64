@@ -70,12 +70,10 @@ int gdt_use_tss(ARC_GDTRegister *gdtr, ARC_TSSDescriptor *tss) {
 	return _install_tss(sizeof(gdtr->gdt));
 }
 
-ARC_TSSDescriptor *init_tss(uintptr_t ist1, uintptr_t rsp0) {
-	ARC_TSSDescriptor *tss = alloc(sizeof(*tss));
-
+int init_static_tss(ARC_TSSDescriptor *tss, uintptr_t ist1, uintptr_t rsp0) {
 	if (tss == NULL) {
-		ARC_DEBUG(ERR, "Failed to allocate TSS\n");
-		return NULL;
+		ARC_DEBUG(ERR, "Invalid parameters\n");
+		return -1;
 	}
 
 	memset(tss, 0, sizeof(*tss));
@@ -85,9 +83,42 @@ ARC_TSSDescriptor *init_tss(uintptr_t ist1, uintptr_t rsp0) {
 	tss->rsp0_low = (rsp0 & UINT32_MAX);
 	tss->rsp0_high = (rsp0 >> 32) & UINT32_MAX;
 
+	return 0;
+}
+
+ARC_TSSDescriptor *init_tss(uintptr_t ist1, uintptr_t rsp0) {
+	ARC_TSSDescriptor *tss = alloc(sizeof(*tss));
+
+	if (tss == NULL) {
+		ARC_DEBUG(ERR, "Failed to allocate TSS\n");
+		return NULL;
+	}
+
+	init_static_tss(tss, ist1, rsp0);
+
 	ARC_DEBUG(INFO, "Created TSS\n");
 
 	return tss;
+}
+
+int init_static_gdt(ARC_GDTRegister *gdtr) {
+	if (gdtr == NULL) {
+		ARC_DEBUG(ERR, "Invalid parameters\n");
+		return -1;
+	}
+
+	memset(gdtr, 0, sizeof(*gdtr));
+
+	set_gdt_gate(gdtr, 1, 0, 0xFFFFFFFF, 0x9A, 0xA); // Kernel Code 64
+	set_gdt_gate(gdtr, 2, 0, 0xFFFFFFFF, 0x92, 0xC); // Kernel Data 32 / 64
+	set_gdt_gate(gdtr, 3, 0, 0xFFFFFFFF, 0xF2, 0xC); // User Data 32 / 64
+	set_gdt_gate(gdtr, 4, 0, 0xFFFFFFFF, 0xFA, 0xA); // User Code 64
+
+	gdtr->reg.size = sizeof(*gdtr) - 1 - sizeof(gdtr->reg);
+	gdtr->reg.base = (uintptr_t)gdtr;
+
+
+	return 0;
 }
 
 ARC_GDTRegister *init_gdt() {
@@ -101,14 +132,7 @@ ARC_GDTRegister *init_gdt() {
 	}
 
 	memset(gdtr, 0, sizeof(*gdtr));
-
-	set_gdt_gate(gdtr, 1, 0, 0xFFFFFFFF, 0x9A, 0xA); // Kernel Code 64
-	set_gdt_gate(gdtr, 2, 0, 0xFFFFFFFF, 0x92, 0xC); // Kernel Data 32 / 64
-	set_gdt_gate(gdtr, 3, 0, 0xFFFFFFFF, 0xF2, 0xC); // User Data 32 / 64
-	set_gdt_gate(gdtr, 4, 0, 0xFFFFFFFF, 0xFA, 0xA); // User Code 64
-
-	gdtr->reg.size = sizeof(*gdtr) - 1 - sizeof(gdtr->reg);
-	gdtr->reg.base = (uintptr_t)gdtr;
+	init_static_gdt(gdtr);
 
 	return gdtr;
 }
