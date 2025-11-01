@@ -88,7 +88,7 @@ void pcid_free(int pcid) {
 }
 
 int init_pcid() {
-        if (!MASKED_READ(Arc_KernelMeta->paging_features, ARC_PAGER_FLAG_PCID, 1)) {
+        if (!MASKED_READ(Arc_CurProcessorDescriptor->features.paging, ARC_PAGER_FLAG_PCID, 1)) {
                 ARC_DEBUG(ERR, "PCIDs are disabled\n");
                 return -1;
         }

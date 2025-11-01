@@ -38,6 +38,7 @@
 #include "arch/x86-64/pcid.h"
 #include "arch/x86-64/smp.h"
 #include "arch/x86-64/util.h"
+#include "arctan.h"
 #include "config.h"
 #include "lib/util.h"
 #include "mm/allocator.h"
@@ -75,8 +76,8 @@ extern uint8_t _AP_START_BEGIN;
 extern uint8_t _AP_START_END;
 extern uint8_t _AP_START_INFO;
 
-struct ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
-struct ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
+ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
+ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
 USERSPACE(bss) ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor = NULL;
 USERSPACE(bss) uint32_t Arc_ProcessorCounter = 0;
 
@@ -85,11 +86,13 @@ void smp_hold() {
 }
 
 static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
- 	init_lapic();
+	ARC_x64ProcessorDescriptor *current = NULL;
 
-	ARC_x64ProcessorDescriptor *current = &Arc_ProcessorList[Arc_ProcessorCounter];
-
-	printf("Current proc desc: %p\n", current);
+	if (Arc_ProcessorCounter == 0) {
+		current = context_get_proc_desc();
+	} else {
+		current = &Arc_ProcessorList[Arc_ProcessorCounter];
+	}
 
 	if (Arc_ProcessorCounter == 0) {
 		Arc_BootProcessor = current;
@@ -108,7 +111,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	ARC_TSSDescriptor *tss = &current->proc_structs.tss;
 	ARC_GDTRegister *gdtr = &current->proc_structs.gdtr;
 
-
 	if (init_static_tss(tss, ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16) != 0) {
 		ARC_DEBUG(ERR, "Failed to create TSS\n");
 		ARC_HANG;
@@ -124,6 +126,8 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	context_set_proc_desc(current);
 	context_set_proc_features();
+
+	init_lapic();
 
 	ARC_IDTRegister *idtr = &current->proc_structs.idtr;
 	ARC_IDTEntry *entries = current->proc_structs.idt_entries;
@@ -163,9 +167,9 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	init_pcid();
 
-
-
 	Arc_ProcessorCounter++;
+
+	ARC_DEBUG(INFO, "Registered processor (acpi_uid=%d)\n", acpi_uid);
 
 	desc->flags |= 1 << ARC_SMP_FLAGS_INIT;
 
@@ -271,7 +275,7 @@ int smp_init_ap(uint32_t processor, uint32_t acpi_uid, uint32_t acpi_flags, uint
 	info->gdt_addr = ARC_HHDM_TO_PHYS(&info->gdt_table);
 	info->pat = _x86_RDMSR(0x277);
 	info->flags |= (1 << ARC_AP_INFO_FLAGS_PAT);
-	info->flags |= ((Arc_KernelMeta->paging_features & 1) << ARC_AP_INFO_FLAGS_NX);
+	info->flags |= MASKED_READ(Arc_CurProcessorDescriptor->features.paging, ARC_PAGER_FLAG_NX, 1) << ARC_AP_INFO_FLAGS_NX;
 	info->acpi_flags = acpi_flags;
 	info->acpi_uid = acpi_uid;
 
@@ -322,6 +326,8 @@ int init_smp() {
 	while (acpi_get_next_madt_entry(ARC_MADT_ENTRY_TYPE_LAPIC, &it) != NULL) {
 		processors++;
 	}
+	// NOTE: There is already a structure for the BSP
+	processors--;
 
 	Arc_ProcessorList = (ARC_x64ProcessorDescriptor *)alloc(sizeof(*Arc_ProcessorList) * processors);
 

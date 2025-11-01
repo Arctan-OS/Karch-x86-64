@@ -48,9 +48,10 @@
 //       Find out if other functions do this too, or if it just this one and fix it.
 
 #define ADDRESS_MASK 0x000FFFFFFFFFF000
-
 #define ONE_GIB 0x40000000
 #define TWO_MIB 0x200000
+
+#define CHECK_FEATURE(feature) ((Arc_CurProcessorDescriptor->features.paging >> (feature)) & 1)
 
 uintptr_t USERSPACE(bss) Arc_KernelPageTables = 0;
 
@@ -125,7 +126,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	//       to looking things up
 	bits |= (((attributes >> ARC_PAGER_US) & 1) | us_rw_overwrite) << 2;
 	bits |= (((attributes >> ARC_PAGER_RW) & 1) | us_rw_overwrite) << 1;
-	bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & ((Arc_KernelMeta->paging_features >> ARC_PAGER_FLAG_NO_EXEC) & 1)) << 63;
+	bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & CHECK_FEATURE(ARC_PAGER_FLAG_NX)) << 63;
 	bits |= 1; // Present
 
 	return bits;
@@ -207,10 +208,11 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	info->size = ALIGN_UP(info->size, PAGE_SIZE);
 
 	while (info->size) {
-		uint8_t can_gib = ((Arc_KernelMeta->paging_features >> ARC_PAGER_FLAG_1_GIB) & 1)
-				   && (MASKED_READ(info->attributes, ARC_PAGER_4K, 1) == 0) && (info->size >= ONE_GIB);
-		uint8_t can_2mib = (info->size >= TWO_MIB)
-				   && (MASKED_READ(info->attributes, ARC_PAGER_4K, 1) == 0);
+		bool can_gib = CHECK_FEATURE(ARC_PAGER_FLAG_GIB)
+			       && !MASKED_READ(info->attributes, ARC_PAGER_4K, 1)
+			       && (info->size >= ONE_GIB);
+		bool can_2mib = (info->size >= TWO_MIB)
+				&& !MASKED_READ(info->attributes, ARC_PAGER_4K, 1);
 
 		MASKED_WRITE(info->attributes, can_gib, ARC_PAGER_RESV0, 1);
 		MASKED_WRITE(info->attributes, can_2mib, ARC_PAGER_RESV1, 1);
@@ -293,11 +295,15 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 }
 
 void *pager_create_page_tables() {
-	int pcid = pcid_allocate();
+	int pcid = 0;
 
-	if (pcid < 0) {
-		ARC_DEBUG(ERR, "Failed to allocate PCID\n");
-		return NULL;
+	if (CHECK_FEATURE(ARC_PAGER_FLAG_PCID)) {
+		pcid = pcid_allocate();
+
+		if (pcid < 0) {
+			ARC_DEBUG(ERR, "Failed to allocate PCID\n");
+			return NULL;
+		}
 	}
 
 	void *tables = pmm_fast_page_alloc();

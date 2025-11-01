@@ -29,24 +29,32 @@
 #include "arch/x86-64/apic.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/interrupt.h"
+#include "arch/x86-64/smp.h"
+#include "global.h"
 #include "util.h"
 
 #define EARLY_KERNEL_CS 0x18
 
-ARC_IDTEntry idt_entries[32] = { 0 };
-ARC_IDTRegister idt_register = {
-        .base = (uintptr_t)&idt_entries,
-        .limit = sizeof(idt_entries) * 16 - 1
+USERSPACE(data) ARC_x64ProcessorDescriptor bsp = {
+        .proc_structs = {
+                .idtr = {
+                        .base = (uintptr_t)bsp.proc_structs.idt_entries,
+                        .limit = (32 * 16) - 1,
+                },
+        },
 };
 
 int init_arch_early() {
         Arc_KernelPageTables = _x86_getCR3();
 
-        internal_init_early_exceptions(idt_entries, EARLY_KERNEL_CS, 0);
-        interrupt_load(&idt_register);
+        memcpy(&bsp.features, &Arc_KernelMeta->features, sizeof(ARC_ProcessorFeatures));
+        internal_init_early_exceptions(bsp.proc_structs.idt_entries, EARLY_KERNEL_CS, 0);
+        interrupt_load(&bsp.proc_structs.idtr);
         // NOTE: Loading a GDT is not the most vital thing. The bootstrapper should
         //       provide an OK one to use. Only during APIC initialization does a
         //       GDT really need to get created
+
+        context_set_proc_desc(&bsp);
 
         return 0;
 }
