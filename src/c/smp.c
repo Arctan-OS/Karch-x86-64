@@ -90,12 +90,9 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	if (Arc_ProcessorCounter == 0) {
 		current = context_get_proc_desc();
+		Arc_BootProcessor = current;
 	} else {
 		current = &Arc_ProcessorList[Arc_ProcessorCounter];
-	}
-
-	if (Arc_ProcessorCounter == 0) {
-		Arc_BootProcessor = current;
 	}
 
 	ARC_ProcessorDescriptor *desc = &current->descriptor;
