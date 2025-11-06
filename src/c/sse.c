@@ -29,7 +29,7 @@
 #include "arch/x86-64/context.h"
 #include <arch/x86-64/ctrl_regs.h>
 #include <global.h>
-#include <cpuid.h>
+
 #include <mm/allocator.h>
 #include <lib/util.h>
 
@@ -39,24 +39,7 @@
 //       floating point data. For now though, fxsave/rstor are used.
 
 int init_sse(ARC_Context * context) {
-	register uint32_t eax;
-	register uint32_t ebx;
-	register uint32_t ecx;
-	register uint32_t edx;
-
-	__cpuid(0x01, eax, ebx, ecx, edx);
-
-	if (((edx >> 24) & 1) == 0) {
-		ARC_DEBUG(ERR, "No fxsave/rstor instructions\n");
-		return -1;
-	}
-
-	if ((((edx >> 25) & 1) == 0 && ((edx >> 26) & 1) == 0
-	    && (ecx & 1) == 0 && ((ecx >> 9) & 1) == 0)) {
-		ARC_DEBUG(ERR, "No support for SSE\n");
-		return -2;
-	}
-
+        // TODO: Xsave needs more bytes
 	void *fxsave_space = alloc(512);
 
         if (fxsave_space == NULL) {
@@ -66,12 +49,11 @@ int init_sse(ARC_Context * context) {
 
         memset(fxsave_space, 0, 512);
 
-        context->fxsave_space = fxsave_space;
+        context->xsave_space = fxsave_space;
 
 	context->frame.gpr.cr0 &= ~(1 << 2); // Disable x87 FPU emulation
 	context->frame.gpr.cr0 |= (1 << 1);
 
-	context->frame.gpr.cr4 |= (1 << 9); // OSFXSR
 	context->frame.gpr.cr4 |= (1 << 10); // OSXMMEXCPT
 
 	ARC_DEBUG(INFO, "Initalized SSE\n");

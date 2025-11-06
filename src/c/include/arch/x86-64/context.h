@@ -107,7 +107,7 @@ typedef struct ARC_InterruptFrame {
 } __attribute__((packed)) ARC_InterruptFrame;
 
 typedef struct ARC_Context {
-	void *fxsave_space;
+	void *xsave_space;
 	void *tcb;
 	ARC_InterruptFrame frame;
 } ARC_Context;
