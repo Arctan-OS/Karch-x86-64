@@ -49,7 +49,7 @@
 #define STACK_PUSH(__rsp, __val) __rsp[0] = __val; __rsp -= 8;
 
 int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
-        uint64_t *rsp = (uint64_t *)thread->pstack + thread->stack_size - 16;
+        uint64_t *rsp = (uint64_t *)thread->stack.phys + thread->stack.size - 16;
         uint64_t *rbp = rsp;
 
         if (rsp == NULL) {
