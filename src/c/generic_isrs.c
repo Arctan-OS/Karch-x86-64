@@ -43,34 +43,34 @@
         extern void _idt_stub_##_vector();                              \
         USERSPACE(text) void generic_interrupt_handler_##_vector(ARC_InterruptFrame *frame)
 
-#define GENERIC_HANDLER_PREAMBLE                               \
+#define GENERIC_HANDLER_PREAMBLE                                        \
         int processor_id = lapic_get_id();                              \
         (void)processor_id;                                             \
 
 #define GENERIC_EXCEPTION_REG_DUMP(_vector) \
         printf("Received Interrupt %d (%s) from LAPIC %d\n", _vector,   \
                exception_names[_vector], processor_id);                 \
-        printf("RAX: 0x%016" PRIx64 "\n", frame->gpr.rax);                   \
-        printf("RBX: 0x%016" PRIx64 "\n", frame->gpr.rbx);                   \
-        printf("RCX: 0x%016" PRIx64 "\n", frame->gpr.rcx);                   \
-        printf("RDX: 0x%016" PRIx64 "\n", frame->gpr.rdx);                   \
-        printf("RSI: 0x%016" PRIx64 "\n", frame->gpr.rsi);                   \
-        printf("RDI: 0x%016" PRIx64 "\n", frame->gpr.rdi);                   \
-        printf("RSP: 0x%016" PRIx64 "\tSS: 0x%" PRIx64 "\n", frame->rsp,         \
-               frame->ss);                                    \
-        printf("RBP: 0x%016" PRIx64 "\n", frame->gpr.rbp);                   \
-        printf("R8 : 0x%016" PRIx64 "\n", frame->gpr.r8);                    \
-        printf("R9 : 0x%016" PRIx64 "\n", frame->gpr.r9);                    \
-        printf("R10: 0x%016" PRIx64 "\n", frame->gpr.r10);                   \
-        printf("R11: 0x%016" PRIx64 "\n", frame->gpr.r11);                   \
-        printf("R12: 0x%016" PRIx64 "\n", frame->gpr.r12);                   \
-        printf("R13: 0x%016" PRIx64 "\n", frame->gpr.r13);                   \
-        printf("R14: 0x%016" PRIx64 "\n", frame->gpr.r14);                   \
-        printf("R15: 0x%016" PRIx64 "\n", frame->gpr.r15);                   \
-        printf("RFLAGS: 0x016%" PRIx64 "\n", frame->rflags);  \
+        printf("RAX: 0x%016" PRIx64 "\n", frame->gpr.rax);              \
+        printf("RBX: 0x%016" PRIx64 "\n", frame->gpr.rbx);              \
+        printf("RCX: 0x%016" PRIx64 "\n", frame->gpr.rcx);              \
+        printf("RDX: 0x%016" PRIx64 "\n", frame->gpr.rdx);              \
+        printf("RSI: 0x%016" PRIx64 "\n", frame->gpr.rsi);              \
+        printf("RDI: 0x%016" PRIx64 "\n", frame->gpr.rdi);              \
+        printf("RSP: 0x%016" PRIx64 "\tSS: 0x%" PRIx64 "\n", frame->rsp, \
+               frame->ss);                                              \
+        printf("RBP: 0x%016" PRIx64 "\n", frame->gpr.rbp);              \
+        printf("R8 : 0x%016" PRIx64 "\n", frame->gpr.r8);               \
+        printf("R9 : 0x%016" PRIx64 "\n", frame->gpr.r9);               \
+        printf("R10: 0x%016" PRIx64 "\n", frame->gpr.r10);              \
+        printf("R11: 0x%016" PRIx64 "\n", frame->gpr.r11);              \
+        printf("R12: 0x%016" PRIx64 "\n", frame->gpr.r12);              \
+        printf("R13: 0x%016" PRIx64 "\n", frame->gpr.r13);              \
+        printf("R14: 0x%016" PRIx64 "\n", frame->gpr.r14);              \
+        printf("R15: 0x%016" PRIx64 "\n", frame->gpr.r15);              \
+        printf("RFLAGS: 0x016%" PRIx64 "\n", frame->rflags);            \
         printf("Return address: 0x%"PRIx64":0x%016"PRIx64"\n", frame->cs, \
-               frame->rip);                                   \
-        printf("Error code: 0x%"PRIx64"\n", frame->error);      \
+               frame->rip);                                             \
+        printf("Error code: 0x%"PRIx64"\n", frame->error);              \
 
 #define GENERIC_HANDLER_POSTAMBLE      \
         lapic_eoi();
