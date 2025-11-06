@@ -215,6 +215,31 @@ ARC_Context *init_context(uint64_t flags) {
 
         memset(ret, 0, sizeof(*ret));
 
+        int xsave_space_size = 0;
+
+        if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
+                xsave_space_size = 576; // Additional 64 bytes for xsave header
+                // TODO: Add in other things that are enabled into size.
+                //       This will most likely depend on the flags parameter
+                //       and context_set_proc_features.
+        } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
+                xsave_space_size = 512;
+        }
+
+        if (xsave_space_size >= 512) {
+                void *xsave_space = alloc(xsave_space_size);
+
+                if (xsave_space == NULL) {
+                        ARC_DEBUG(ERR, "Failed to allocate xsave space\n");
+                        free(ret);
+                        return NULL;
+                }
+
+                memset(xsave_space, 0, xsave_space_size);
+
+                ret->xsave_space = xsave_space;
+        }
+
         ret->frame.gpr.cr0 = _x86_getCR0();
         ret->frame.gpr.cr4 = _x86_getCR4();
 

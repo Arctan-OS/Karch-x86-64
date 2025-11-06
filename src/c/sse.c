@@ -40,16 +40,7 @@
 
 int init_sse(ARC_Context * context) {
         // TODO: Xsave needs more bytes
-	void *fxsave_space = alloc(512);
 
-        if (fxsave_space == NULL) {
-                ARC_DEBUG(ERR, "Failed to allocate fxsave space\n");
-		return -3;
-        }
-
-        memset(fxsave_space, 0, 512);
-
-        context->xsave_space = fxsave_space;
 
 	context->frame.gpr.cr0 &= ~(1 << 2); // Disable x87 FPU emulation
 	context->frame.gpr.cr0 |= (1 << 1);
