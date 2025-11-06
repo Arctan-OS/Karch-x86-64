@@ -177,6 +177,19 @@ int context_check_features(ARC_ProcessorFeatures *needed, ARC_ProcessorFeatures 
         return 0;
 }
 
+void context_setup_for_thread(ARC_Context *context, void *entry, void *stack, void *page_tables, bool userspace) {
+        context->frame.rip = (uintptr_t)entry;
+        context->frame.cs = userspace ? 0x23 : 0x8;
+
+        context->frame.ss = userspace ? 0x1b : 0x10;
+        context->frame.gpr.rbp = (uintptr_t)stack;
+        context->frame.rsp = context->frame.gpr.rbp;
+
+        context->frame.rflags = (1 << 9) | (1 << 1) | (0b11 << 12);
+
+        context->frame.gpr.cr3 = ARC_HHDM_TO_PHYS(page_tables);
+}
+
 int uninit_context(ARC_Context *context) {
         if (context == NULL) {
                 return -1;
