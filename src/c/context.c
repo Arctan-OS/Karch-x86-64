@@ -32,6 +32,7 @@
 #include "arctan.h"
 #include "global.h"
 #include "mm/allocator.h"
+#include "userspace/thread.h"
 #include "util.h"
 
 #include <cpuid.h>
@@ -90,17 +91,6 @@ void context_load(ARC_Context *ctx, ARC_InterruptFrame *to) {
                          fxrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         }
 
-}
-
-int uninit_context(ARC_Context *context) {
-        if (context == NULL) {
-                return -1;
-        }
-
-        free(context->xsave_space);
-        free(context);
-
-        return 0;
 }
 
 int context_set_proc_features(ARC_ProcessorFeatures *features) {
@@ -187,7 +177,18 @@ int context_check_features(ARC_ProcessorFeatures *needed, ARC_ProcessorFeatures 
         return 0;
 }
 
-ARC_Context *init_context(uint64_t flags) {
+int uninit_context(ARC_Context *context) {
+        if (context == NULL) {
+                return -1;
+        }
+
+        free(context->xsave_space);
+        free(context);
+
+        return 0;
+}
+
+ARC_Context *init_context(uint64_t flags, ARC_ProcessorFeatures *features) {
         ARC_Context *ret = alloc(sizeof(*ret));
 
         if (ret == NULL) {
@@ -200,11 +201,13 @@ ARC_Context *init_context(uint64_t flags) {
         int xsave_space_size = 0;
 
         if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
+                features->proc0 |= 1 << ARC_PROC0_FLAG_XSAVE;
                 xsave_space_size = 576; // Additional 64 bytes for xsave header
                 // TODO: Add in other things that are enabled into size.
                 //       This will most likely depend on the flags parameter
                 //       and context_set_proc_features.
         } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
+                features->proc0 |= 1 << ARC_PROC0_FLAG_FXSAVE;
                 xsave_space_size = 512;
         }
 
@@ -226,6 +229,7 @@ ARC_Context *init_context(uint64_t flags) {
         ret->frame.gpr.cr4 = _x86_getCR4();
 
         if (MASKED_READ(flags, ARC_CONTEXT_FLAG_FLOATS, 1)) {
+                features->proc0 |= 1 << ARC_PROC0_FLAG_SSE1;
                 ret->frame.gpr.cr0 &= ~(1 << 2); // Disable x87 FPU emulation
                 ret->frame.gpr.cr0 |= (1 << 1);
                 ret->frame.gpr.cr4 |= (1 << 10); // OSXMMEXCPT
