@@ -122,7 +122,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	gdt_use_tss(gdtr, tss);
 
 	context_set_proc_desc(current);
-	context_set_proc_features();
+	context_set_proc_features(&current->features);
 
 	init_lapic();
 

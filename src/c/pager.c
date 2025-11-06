@@ -51,8 +51,6 @@
 #define ONE_GIB 0x40000000
 #define TWO_MIB 0x200000
 
-#define CHECK_FEATURE(feature) ((Arc_CurProcessorDescriptor->features.paging >> (feature)) & 1)
-
 uintptr_t USERSPACE(bss) Arc_KernelPageTables = 0;
 
 struct pager_traverse_info {
@@ -126,7 +124,7 @@ uint64_t get_entry_bits(uint32_t level, uint32_t attributes) {
 	//       to looking things up
 	bits |= (((attributes >> ARC_PAGER_US) & 1) | us_rw_overwrite) << 2;
 	bits |= (((attributes >> ARC_PAGER_RW) & 1) | us_rw_overwrite) << 1;
-	bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & CHECK_FEATURE(ARC_PAGER_FLAG_NX)) << 63;
+	bits |= (uint64_t)((attributes >> ARC_PAGER_NX) & ARC_CHECK_FEATURE(paging, ARC_PAGER_FLAG_NX)) << 63;
 	bits |= 1; // Present
 
 	return bits;
@@ -208,8 +206,8 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 	info->size = ALIGN_UP(info->size, PAGE_SIZE);
 
 	while (info->size) {
-		bool can_gib = CHECK_FEATURE(ARC_PAGER_FLAG_GIB)
-			       && !MASKED_READ(info->attributes, ARC_PAGER_4K, 1)
+		bool can_gib = ARC_CHECK_FEATURE(paging, ARC_PAGER_FLAG_GIB)
+   			       && !MASKED_READ(info->attributes, ARC_PAGER_4K, 1)
 			       && (info->size >= ONE_GIB);
 		bool can_2mib = (info->size >= TWO_MIB)
 				&& !MASKED_READ(info->attributes, ARC_PAGER_4K, 1);
@@ -297,7 +295,7 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 void *pager_create_page_tables() {
 	int pcid = 0;
 
-	if (CHECK_FEATURE(ARC_PAGER_FLAG_PCID)) {
+	if (ARC_CHECK_FEATURE(paging, ARC_PAGER_FLAG_PCID)) {
 		pcid = pcid_allocate();
 
 		if (pcid < 0) {
@@ -558,16 +556,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 }
 
 int pager_clone(void *dest, void *src, uintptr_t virt_src, uintptr_t virt_dest, size_t size) {
-	// Source = "Is _page_tables the source of the clone?"
-	// source = 0: copy from current page tables to page_tables
-	// source = 1: copy from page_tables to current page tables
-
 	void *pml4 = (void *)ARC_PHYS_TO_HHDM(_x86_getCR3());
-
-	//void *page_tables = _page_tables == NULL ? pml4 : _page_tables;
-
-	//void *src_table = source ? page_tables : pml4;
-	//void *dest_table = source ? pml4 : page_tables;
 
 	void *src_table = src == NULL ? pml4 : src;
 	void *dest_table = dest == NULL ? pml4 : dest;

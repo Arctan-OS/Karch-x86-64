@@ -93,10 +93,6 @@ int init_pcid() {
                 return -1;
         }
 
-        uint64_t cr4 = _x86_getCR4() | 1 << 17; // Set PCIDE bit (17)
-        _x86_setCR4(cr4);
-        ARC_DEBUG(INFO, "Set PCIDe bit\n");
-
         if (pcid_bmp != NULL) {
                 return 0;
         }
