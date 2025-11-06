@@ -29,7 +29,6 @@
 #include "arch/x86-64/context.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/smp.h"
-#include "arch/x86-64/sse.h"
 #include "arctan.h"
 #include "global.h"
 #include "mm/allocator.h"
@@ -174,33 +173,16 @@ int context_check_features(ARC_ProcessorFeatures *needed, ARC_ProcessorFeatures 
         uint64_t paging = needed->paging ^ avl->paging;
         paging &= needed->paging;
 
-        if (paging == 0) {
-                goto paging_ok;
+        if (paging != 0) {
+                return -1;
         }
-
-        // Check for mismatches with critical features
-
-        if (ARC_CHECK_FEATURE(paging, ARC_PAGER_FLAG_PCID)) {
-                // PCIDs aren't that critical, they can just be masked
-                // out of paging tables when loading if they are not
-                // supported on a particular processor
-                goto paging_ok;
-        }
-
-        return -1;
-
-        paging_ok:;
 
         uint64_t proc0 = needed->proc0 ^ avl->proc0;
         proc0 &= needed->proc0;
 
-        if (proc0 == 0) {
-                goto proc0_ok;
+        if (proc0 != 0) {
+                return -2;
         }
-
-        // TODO: Check critical stuff
-
-        proc0_ok:;
 
         return 0;
 }
@@ -243,10 +225,10 @@ ARC_Context *init_context(uint64_t flags) {
         ret->frame.gpr.cr0 = _x86_getCR0();
         ret->frame.gpr.cr4 = _x86_getCR4();
 
-        if (MASKED_READ(flags, ARC_CONTEXT_FLAG_FLOATS, 1)
-            && init_sse(ret) != 0) {
-                free(ret);
-                return NULL;
+        if (MASKED_READ(flags, ARC_CONTEXT_FLAG_FLOATS, 1)) {
+                ret->frame.gpr.cr0 &= ~(1 << 2); // Disable x87 FPU emulation
+                ret->frame.gpr.cr0 |= (1 << 1);
+                ret->frame.gpr.cr4 |= (1 << 10); // OSXMMEXCPT
         }
 
         return ret;
