@@ -155,11 +155,17 @@ ARC_ARCHTYPE arch_processor_type() {
 }
 
 __attribute__((naked)) uint64_t arch_get_cycles() {
-	__asm__("rdtsc; shl rdx, 32; or rdx, rax; mov rax, rdx; ret" :::);
+	__asm__("rdtsc; \
+                 shl rdx, 32;\
+                 or rdx, rax;\
+                 mov rax, rdx;\
+                 ret" :::);
 }
 
 __attribute__((naked)) uint64_t arch_get_flags() {
-        __asm__("pushfq; pop rax; ret" :::);
+        __asm__("pushfq;\
+                 pop rax; \
+                 ret" :::);
 }
 
 bool arch_interrupts_enabled() {

@@ -46,13 +46,25 @@
         void __attribute__((naked)) USERSPACE(text) ARC_NAME_IRQ(_handler)() { \
                 __asm__("push 0"); \
                 ARC_ASM_PUSH_ALL \
-                __asm__("mov ax, 0x10; mov ss, ax"); \
-                __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
-                __asm__("mov rax, [rax]; mov cr3, rax" :: "a"(&_page_tables) :); \
-                __asm__("mov rdi, rsp; call %0" :: "i"(_handler) :); \
-                __asm__("mov ax, cs; cmp ax, [rsp + 160]; je 1f; swapgs; 1:"); \
+                __asm__("mov ax, 0x10; \
+                         mov ss, ax; \
+                         mov ax, cs; \
+                         cmp ax, [rsp + 160]; \
+                         je 1f; \
+                         swapgs; \
+                         1:"); \
+                __asm__("mov rax, [rax]; \
+                         mov cr3, rax; \
+                         mov rdi, rsp; \
+                         call %1; \
+                         mov ax, cs; \
+                         cmp ax, [rsp + 160]; \
+                         je 1f; \
+                         swapgs; \
+                         1:" :: "a"(&_page_tables), "i"(_handler) :); \
                 ARC_ASM_POP_ALL \
-                __asm__("add rsp, 8; iretq"); \
+                __asm__("add rsp, 8;\
+                         iretq"); \
         }
 
 typedef struct ARC_IDTEntry {
