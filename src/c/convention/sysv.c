@@ -27,7 +27,7 @@
 #include "arch/convention/sysv.h"
 #include "global.h"
 #include "lib/util.h"
-#include "userspace/thread.h"
+
 
 #include <stdint.h>
 
