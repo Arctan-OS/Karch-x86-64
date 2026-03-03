@@ -320,9 +320,11 @@ static int pager_map_callback(struct pager_traverse_info *info, uint64_t *table,
 		return -1;
 	}
 
+        bool A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
+        
 	table[index] = info->physical | get_entry_bits(level, info->attributes);
 
-	if (info->dest_table == info->cur_table) {
+	if (A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -353,9 +355,11 @@ static int pager_unmap_callback(struct pager_traverse_info *info, uint64_t *tabl
 		info->physical = table[index] & ADDRESS_MASK;
 	}
 
+        bool A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
+        
 	table[index] = 0;
 
-	if (info->dest_table == info->cur_table) {
+	if (A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -392,9 +396,11 @@ static int pager_fly_map_callback(struct pager_traverse_info *info, uint64_t *ta
 		return -2;
 	}
 
+        bool A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
+        
 	table[index] = ARC_HHDM_TO_PHYS(page) | get_entry_bits(level, info->attributes);
 
-	if (info->dest_table == info->cur_table) {
+	if (A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -421,10 +427,11 @@ static int pager_fly_unmap_callback(struct pager_traverse_info *info, uint64_t *
 		return -1;
 	}
 
+        bool A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
 	pmm_fast_page_free((void *)ARC_PHYS_TO_HHDM(table[index] & ADDRESS_MASK));
 	table[index] = 0;
 
-	if (info->dest_table == info->cur_table) {
+	if (A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -449,11 +456,12 @@ static int pager_set_attr_callback(struct pager_traverse_info *info, uint64_t *t
 	if (info == NULL || table == NULL || level == 0) {
 		return -1;
 	}
-
+        
+        bool A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
 	uint64_t address = table[index] & ADDRESS_MASK;
 	table[index] = address | get_entry_bits(level, info->attributes);
 
-	if (info->dest_table == info->cur_table) {
+	if (A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
@@ -484,6 +492,8 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 		return -1;
 	}
 
+        bool A = true;
+        
 //	printf("pml4=%p\n", info->src_table);
 
 	uint64_t *pml3 = NULL;
@@ -508,6 +518,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 			return -2;
 		}
 		// 1 GiB page
+                A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
 		table[index] = pml3[info->pml3e];
 		goto basic_quit;
 	}
@@ -526,6 +537,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 			return -2;
 		}
 		// 2 MiB page
+                A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
 		table[index] = pml2[info->pml2e];
 		goto basic_quit;
 	}
@@ -544,6 +556,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	// 4 KiB page
+        A = ((table[index] >> 5) & 1) && info->dest_table == info->cur_table;
 	table[index] = pml1[info->pml1e];
 
 	basic_quit:;
