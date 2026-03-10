@@ -33,6 +33,10 @@
 #define PAGE_SIZE_LOWEST_EXPONENT 12
 #define PAGE_SIZE (size_t)(1 << PAGE_SIZE_LOWEST_EXPONENT)
 
+#ifndef ARC_SYSCALL_STACK_SIZE
+        #define ARC_SYSCALL_STACK_SIZE 0x2000
+#endif
+
 #ifndef ARC_PMM_LOW_MEM_LIM
         // The first address from zero that is in high memory.
         // Where a is an address:

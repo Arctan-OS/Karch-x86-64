@@ -27,7 +27,7 @@
 #include "arch/convention/sysv.h"
 #include "global.h"
 #include "lib/util.h"
-
+#include "mm/pmm.h"
 
 #include <stdint.h>
 
@@ -111,4 +111,12 @@ int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char 
         thread->context->frame.rsp -= (uintptr_t)rbp - (uintptr_t)rsp;
 
         return 0;
+}
+
+uintptr_t USERSPACE(text) syscall_get_stack() {
+        return (uintptr_t)pmm_alloc(ARC_SYSCALL_STACK_SIZE) + ARC_SYSCALL_STACK_SIZE - 16;
+}
+
+void USERSPACE(text) syscall_free_stack(uintptr_t address) {
+        pmm_free((void *)(address + 16 - ARC_SYSCALL_STACK_SIZE));
 }

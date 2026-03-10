@@ -36,12 +36,30 @@ global _syscall
 extern Arc_SyscallTable
 extern Arc_KernelPageTables
 extern syscall_get_kpages
+extern syscall_get_stack
+extern syscall_free_stack 
 _syscall:
         swapgs
 
+        ;; NOTE: Contaminates user's RDX
         mov rdx, rsp            ; Save user RSP
-        mov rsp, [gs:0]         ; Switch to kernel stack
-        add rsp, 0x2000 - 16
+        push rax
+
+        call syscall_get_stack  ; Get the stack
+        mov rsp, rax            ; Switch to kernel stack
+        
+        ;; TODO: Would be nice to get rid of this call
+        ;;       such that it could just be:
+        ;;       mov rax, [gs:<offset of descriptor pointer>]
+        ;;       mov rax, [rax:<offset of process pointer>]
+        ;;       mov rax, [rax:<offset of page_tables.kernel>]
+        ;;       Problem: don't know those offsets, and don't
+        ;;       know how to get them
+        call syscall_get_kpages
+        mov cr3, rax
+
+        ;; "pop rax"
+        mov rax, qword [rdx]
 
         push 0                  ; SS
         push rdx                ; User stack
@@ -50,18 +68,6 @@ _syscall:
         push rcx                ; Return address
         push 0                  ; Dummy error code
         PUSH_ALL                ; Save user context
-
-        ;; TODO: Would be nice to get rid of this call
-        ;;       such that it could just be:
-        ;;       mov rax, [gs:<offset of descriptor pointer>]
-        ;;       mov rax, [rax:<offset of process pointer>]
-        ;;       mov rax, [rax:<offset of page_tables.kernel>]
-        ;;       Problem: don't know those offsets, and don't
-        ;;       know how to get them
-        push rax
-        call syscall_get_kpages
-        mov cr3, rax
-        pop rax
 
         ;; Figure out what handler to call
         shl rax, 3
@@ -79,6 +85,11 @@ _syscall:
         pop r11
         pop rsp
 
+        push rdi
+        mov rdi, rdx
+        call syscall_free_stack
+        pop rdi
+        
         swapgs
 
         o64 sysret
