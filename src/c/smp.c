@@ -136,6 +136,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	}
 
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
+        interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 	interrupt_load(idtr);
 
 	current->ist1 = ist1;
@@ -159,8 +160,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 		lapic_refresh_timer(1000);
 		lapic_calibrate_timer();
 	}
-
-	interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 
 	init_pcid();
 
