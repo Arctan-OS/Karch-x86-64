@@ -41,20 +41,14 @@ extern syscall_free_stack
 _syscall:
         swapgs
 
-        ;; NOTE: Contaminates user's RDX
+        push rdx
+        
         mov rdx, rsp            ; Save user RSP
         push rax
 
         call syscall_get_stack  ; Get the stack
         mov rsp, rax            ; Switch to kernel stack
         
-        ;; TODO: Would be nice to get rid of this call
-        ;;       such that it could just be:
-        ;;       mov rax, [gs:<offset of descriptor pointer>]
-        ;;       mov rax, [rax:<offset of process pointer>]
-        ;;       mov rax, [rax:<offset of page_tables.kernel>]
-        ;;       Problem: don't know those offsets, and don't
-        ;;       know how to get them
         call syscall_get_kpages
         mov cr3, rax
 
@@ -85,11 +79,12 @@ _syscall:
         pop r11
         pop rsp
 
-        push rdi
-        mov rdi, rdx
+        xchg rdi, rdx
         call syscall_free_stack
-        pop rdi
+        xchg rdi, rdx
+
+        pop rdx
         
         swapgs
-
+        
         o64 sysret

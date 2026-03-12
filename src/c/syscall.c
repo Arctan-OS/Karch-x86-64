@@ -34,9 +34,19 @@
 #include <mp/scheduler.h>
 #include <arch/smp.h>
 #include <stdint.h>
+#include "arch/convention.h"
+#include "config.h"
 
 uintptr_t USERSPACE(text) syscall_get_kpages() {
 	return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel);
+}
+
+void * USERSPACE(text) syscall_get_stack() {
+        return conv_get_stack(ARC_SYSCALL_STACK_SIZE);
+}
+
+void USERSPACE(text) syscall_free_stack(void *address) {
+        conv_free_stack(address, ARC_SYSCALL_STACK_SIZE);
 }
 
 extern int _syscall();
