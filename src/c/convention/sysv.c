@@ -24,7 +24,9 @@
  *
  * @DESCRIPTION
 */
-#include "arch/convention/sysv.h"
+#ifdef ARC_TARGET_CONV_SYSV
+
+#include "arch/convention.h"
 #include "global.h"
 #include "lib/util.h"
 #include "mm/pmm.h"
@@ -48,7 +50,7 @@
 
 #define STACK_PUSH(__rsp, __val) __rsp[0] = __val; __rsp -= 8;
 
-int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
+int conv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
         uint64_t *rsp = (uint64_t *)thread->stack.phys + thread->stack.size - 16;
         uint64_t *rbp = rsp;
 
@@ -113,10 +115,13 @@ int sysv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char 
         return 0;
 }
 
-uintptr_t USERSPACE(text) syscall_get_stack() {
-        return (uintptr_t)pmm_alloc(ARC_SYSCALL_STACK_SIZE) + ARC_SYSCALL_STACK_SIZE - 16;
+
+inline void *conv_get_stack(size_t size) {
+        return (void *)((uintptr_t)pmm_alloc(size) + size - 16);
 }
 
-void USERSPACE(text) syscall_free_stack(uintptr_t address) {
-        pmm_free((void *)(address + 16 - ARC_SYSCALL_STACK_SIZE));
+inline void conv_free_stack(void *stack, size_t size) {
+        pmm_free((void *)((uintptr_t)stack + 16 - size));
 }
+
+#endif
