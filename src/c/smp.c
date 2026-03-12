@@ -92,7 +92,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 		current = context_get_proc_desc();
 		Arc_BootProcessor = current;
 	} else {
-		current = &Arc_ProcessorList[Arc_ProcessorCounter];
+		current = &Arc_ProcessorList[Arc_ProcessorCounter - 1];
 	}
 
 	ARC_ProcessorDescriptor *desc = &current->descriptor;
@@ -139,6 +139,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
         interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 	interrupt_load(idtr);
 
+        // This somehow gets corrupted?
 	current->ist1 = ist1;
 	current->rsp0 = rsp0;
 	current->syscall_stack = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
@@ -162,7 +163,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	}
 
 	init_pcid();
-
+        
 	Arc_ProcessorCounter++;
 
 	ARC_DEBUG(INFO, "Registered processor (acpi_uid=%d)\n", acpi_uid);
@@ -184,8 +185,9 @@ static int smp_move_ap_high_mem(ARC_APStartInfo *info) {
 	//       should be executing this code at a time
 	smp_register_ap(info->acpi_uid, info->acpi_flags);
 
-	ARC_DISABLE_INTERRUPT;
-//	ARC_ENABLE_INTERRUPT;
+        // NOTE: THIS IS ONLY FOR TESTING
+        ARC_DISABLE_INTERRUPT;
+        // ARC_ENABLE_INTERRUPT;
 
 	info->flags |= 1 << ARC_AP_INFO_FLAGS_LM;
 
@@ -227,12 +229,17 @@ int smp_map_processor_structures(void *page_tables) {
 	const uint32_t flags = 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX;
 
 	for (uint32_t i = 0; i < Arc_ProcessorCounter; i++) {
-		ARC_x64ProcessorDescriptor desc = Arc_ProcessorList[i];
-		pager_map(page_tables, (uintptr_t)desc.ist1, ARC_HHDM_TO_PHYS(desc.ist1), ARC_STD_KSTACK_SIZE, flags);
-		pager_map(page_tables, (uintptr_t)desc.rsp0, ARC_HHDM_TO_PHYS(desc.rsp0), ARC_STD_KSTACK_SIZE, flags);
-		pager_map(page_tables, (uintptr_t)desc.syscall_stack, ARC_HHDM_TO_PHYS(desc.syscall_stack), ARC_STD_KSTACK_SIZE, flags);
-
-		pager_map(page_tables, (uintptr_t)&desc, ARC_HHDM_TO_PHYS(&desc), sizeof(desc), flags);
+		ARC_x64ProcessorDescriptor *desc = NULL;
+                if (i == 0) {
+                        desc = Arc_BootProcessor;
+                } else {
+                        desc = &Arc_ProcessorList[i - 1];
+                        pager_map(page_tables, (uintptr_t)&desc, ARC_HHDM_TO_PHYS(&desc), sizeof(*desc), flags);
+                }
+                
+		pager_map(page_tables, (uintptr_t)desc->ist1, ARC_HHDM_TO_PHYS(desc->ist1), ARC_STD_KSTACK_SIZE, flags);
+		pager_map(page_tables, (uintptr_t)desc->rsp0, ARC_HHDM_TO_PHYS(desc->rsp0), ARC_STD_KSTACK_SIZE, flags);
+		pager_map(page_tables, (uintptr_t)desc->syscall_stack, ARC_HHDM_TO_PHYS(desc->syscall_stack), ARC_STD_KSTACK_SIZE, flags);
 
 		ARC_DEBUG(INFO, "Cloned mappings for processor-specific structures to table %p for processor %d\n", page_tables, i);
 	}
@@ -324,7 +331,7 @@ int init_smp() {
 	}
 	// NOTE: There is already a structure for the BSP
 	processors--;
-
+        
 	Arc_ProcessorList = (ARC_x64ProcessorDescriptor *)alloc(sizeof(*Arc_ProcessorList) * processors);
 
 	if (Arc_ProcessorList == NULL) {
