@@ -29,9 +29,9 @@
 
 #include <interface/terminal.h>
 
-#define ARC_HALT __asm__("hlt");
-#define ARC_HANG term_draw(); __asm__("1: hlt; jmp 1b");
-#define ARC_DISABLE_INTERRUPT __asm__("cli");
-#define ARC_ENABLE_INTERRUPT __asm__("sti");
+#define ARC_HALT              asm volatile ("hlt");
+#define ARC_HANG term_draw(); asm volatile ("1: hlt; jmp 1b");
+#define ARC_DISABLE_INTERRUPT asm volatile ("cli");
+#define ARC_ENABLE_INTERRUPT  asm volatile ("sti");
 
 #endif
