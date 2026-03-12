@@ -79,10 +79,10 @@ _syscall:
         pop r11
         pop rsp
 
+        push rdi
         xchg rdi, rdx
         call syscall_free_stack
-        xchg rdi, rdx
-
+        pop rdi
         pop rdx
         
         swapgs
