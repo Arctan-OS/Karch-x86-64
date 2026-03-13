@@ -46,6 +46,7 @@
 #include "mp/scheduler.h"
 #include "util.h"
 #include "global.h"
+#include <stdint.h>
 
 enum {
         ARC_AP_INFO_FLAGS_LM = 0,       // The AP has reached LM
@@ -142,13 +143,24 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
         // This somehow gets corrupted?
 	current->ist1 = ist1;
 	current->rsp0 = rsp0;
-	current->syscall_stack = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
-
-	if (current->syscall_stack == 0) {
+	current->syscall.base = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
+        current->syscall.ptr = current->syscall.base;
+        
+	if (current->syscall.base == 0) {
 		ARC_DEBUG(ERR, "Failed to allocate syscall stack\n");
 		ARC_HANG;
 	}
 
+        uintptr_t syscall_stack0 = (uintptr_t)alloc(ARC_SYSCALL_STACK_SIZE);
+
+        if (syscall_stack0 == 0) {
+                ARC_DEBUG(ERR, "Failed to allocate first syscall stack\n");
+                ARC_HANG;
+        }
+
+        *(uintptr_t *)current->syscall.ptr = syscall_stack0;
+        current->syscall.ptr += sizeof(uintptr_t);
+        
 	if (init_syscall() != 0) {
 		ARC_DEBUG(ERR, "Failed to initialize syscalls\n");
 		ARC_HANG;
@@ -239,7 +251,7 @@ int smp_map_processor_structures(void *page_tables) {
                 
 		pager_map(page_tables, (uintptr_t)desc->ist1, ARC_HHDM_TO_PHYS(desc->ist1), ARC_STD_KSTACK_SIZE, flags);
 		pager_map(page_tables, (uintptr_t)desc->rsp0, ARC_HHDM_TO_PHYS(desc->rsp0), ARC_STD_KSTACK_SIZE, flags);
-		pager_map(page_tables, (uintptr_t)desc->syscall_stack, ARC_HHDM_TO_PHYS(desc->syscall_stack), ARC_STD_KSTACK_SIZE, flags);
+		pager_map(page_tables, (uintptr_t)desc->syscall.base, ARC_HHDM_TO_PHYS(desc->syscall.base), ARC_STD_KSTACK_SIZE, flags);
 
 		ARC_DEBUG(INFO, "Cloned mappings for processor-specific structures to table %p for processor %d\n", page_tables, i);
 	}

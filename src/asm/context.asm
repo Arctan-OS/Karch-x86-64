@@ -28,7 +28,7 @@
 %endif
 bits 64
 
-%macro PUSH_ALL 0
+%macro PUSHAQ 0
         push rbp
         push r15
         push r14
@@ -44,6 +44,10 @@ bits 64
         push rcx
         push rbx
         push rax
+%endmacro
+        
+%macro PUSH_ALL 0
+        PUSHAQ
         mov r15, cr4
         push r15
         mov r15, cr3
@@ -52,13 +56,7 @@ bits 64
         push r15
 %endmacro
 
-%macro POP_ALL 0
-        pop r15
-        mov cr0, r15
-        pop r15
-        mov cr3, r15
-        pop r15
-        mov cr4, r15
+%macro POPAQ 0
         pop rax
         pop rbx
         pop rcx
@@ -74,4 +72,14 @@ bits 64
         pop r14
         pop r15
         pop rbp
+%endmacro
+        
+%macro POP_ALL 0
+        pop r15
+        mov cr0, r15
+        pop r15
+        mov cr3, r15
+        pop r15
+        mov cr4, r15
+        POPAQ
 %endmacro

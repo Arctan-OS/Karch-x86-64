@@ -32,6 +32,10 @@ section .userspace
 
 %include "src/asm/context.asm"
 
+%define PTR 0
+%define BASE 8
+%define LOCK 16
+  
 global _syscall
 extern Arc_SyscallTable
 extern Arc_KernelPageTables
@@ -39,51 +43,79 @@ extern syscall_get_kpages
 extern syscall_get_stack
 extern syscall_free_stack 
 _syscall:
+        cli
         swapgs
 
-        push rdx
+        lock inc [gs:LOCK]
+        push rdx                ; +16
+        mov rdx, [gs:PTR]
+        sub rdx, 8
+        mov [gs:PTR], rdx
+        mov rdx, [rdx]
+        push rdx                ; +8
+        xchg rsp, rdx
+        lock dec [gs:LOCK]
         
-        mov rdx, rsp            ; Save user RSP
-        push rax
-
-        call syscall_get_stack  ; Get the stack
-        mov rsp, rax            ; Switch to kernel stack
-        
-        call syscall_get_kpages
-        mov cr3, rax
-
-        ;; "pop rax"
-        mov rax, qword [rdx]
-
+        ;; Save user context
         push 0                  ; SS
         push rdx                ; User stack
         push r11                ; RFLAGS
         push 0                  ; CS
         push rcx                ; Return address
         push 0                  ; Dummy error code
+        mov rdx, [rdx + 16]     ; Restore value of RDX
         PUSH_ALL                ; Save user context
-
+        
+        PUSHAQ
+        call syscall_get_kpages
+        mov cr3, rax
+        ;; Allocate new syscall stack for next syscall and push it to stack
+        lock inc [gs:LOCK]
+        mov rax, [gs:PTR]
+        cmp rax, [gs:BASE]
+        jg .over
+        lock dec [gs:LOCK]        
+        call syscall_get_stack
+        lock inc [gs:LOCK]
+        mov rbx, [gs:PTR]
+        add rbx, 8
+        mov [rbx], rax
+        mov [gs:PTR], rbx
+.over:
+        lock dec [gs:LOCK]
+        POPAQ
+        
         ;; Figure out what handler to call
         shl rax, 3
         mov r12, Arc_SyscallTable
         add rax, r12
 
+        sti
+        
         ;; Invoke handler, set caller's return code
         call [rax]
         mov qword [rsp + 24], rax
 
-        POP_ALL                 ;Restore user context
+        ;; Restore user context
+        POP_ALL
         add rsp, 8
         pop rcx
         add rsp, 8
         pop r11
+        mov rdi, rsp
+        add rdx, 8
         pop rsp
 
-        push rdi
-        xchg rdi, rdx
-        call syscall_free_stack
-        pop rdi
-        pop rdx
+        pop rdx                 ; +8
+        push rax
+        lock inc [gs:LOCK]
+        mov rax, [gs:PTR]
+        add rax, 8
+        mov [rax], rdx
+        mov [gs:PTR], rax
+        lock dec [gs:LOCK]
+        pop rax
+        pop rdx                 ; +16
         
         swapgs
         
