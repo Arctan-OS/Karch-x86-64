@@ -35,6 +35,8 @@
 #include "userspace/thread.h"
 #include "util.h"
 
+#include "arch/io/port.h"
+
 #include <cpuid.h>
 
 #define FS_BASE_MSR  0xC0000100
@@ -63,34 +65,33 @@ void context_save(ARC_Context *ctx, ARC_InterruptFrame *new) {
         // NOTE: TCB does not need to be saved here, that is done in
         //       context_set_tcb
         if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
-                __asm__("xor rax, rax; \
-                         dec rax;                                       \
-                         mov rdx, rax;                                  \
-                         xsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                asm volatile ("xor rax, rax;                          \
+                               dec rax;                               \
+                               mov rdx, rax;                            \
+                               xsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
-                 __asm__("xor rax, rax; \
-                         dec rax;                                       \
-                         mov rdx, rax;                                  \
-                         fxsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                 asm volatile ("xor rax, rax; \
+                                dec rax;                                       \
+                                mov rdx, rax;                                  \
+                                fxsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         }
 }
 
 void context_load(ARC_Context *ctx, ARC_InterruptFrame *to) {
         memcpy(to, &ctx->frame, sizeof(*to));
         _x86_WRMSR(FS_BASE_MSR, (uintptr_t)ctx->tcb);
-
+        
         if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
-                __asm__("xor rax, rax; \
-                         dec rax;                                       \
-                         mov rdx, rax;                                  \
-                         xrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                asm volatile ("xor rax, rax; \
+                               dec rax;                                       \
+                               mov rdx, rax;                                  \
+                               xrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
-                 __asm__("xor rax, rax; \
-                         dec rax;                                       \
-                         mov rdx, rax;                                  \
-                         fxrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                asm volatile ("xor rax, rax; \
+                               dec rax;                                       \
+                               mov rdx, rax;                                  \
+                               fxrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         }
-
 }
 
 int context_set_proc_features(ARC_ProcessorFeatures *features) {
@@ -177,7 +178,7 @@ int context_check_features(ARC_ProcessorFeatures *needed, ARC_ProcessorFeatures 
         return 0;
 }
 
-void context_setup_for_thread(ARC_Context *context, void *entry, void *stack, void *page_tables, bool userspace) {
+void context_setup_for_thread(ARC_Context *context, void *entry, void *stack, void *page_tables, bool userspace) {        
         context->frame.rip = (uintptr_t)entry;
         context->frame.cs = userspace ? 0x23 : 0x8;
 

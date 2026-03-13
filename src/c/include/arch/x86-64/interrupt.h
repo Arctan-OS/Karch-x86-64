@@ -27,6 +27,8 @@
 #ifndef ARC_ARCH_X86_64_INTERRUPT_H
 #define ARC_ARCH_X86_64_INTERRUPT_H
 
+#include "global.h"
+
 #include <stdint.h>
 
 // TODO: Using printf in an interrupt (that doesn't panic the kernel) will cause
@@ -44,27 +46,27 @@
 // NOTE: _page_tables, and the path to dereference it, must be marked as USERSPACE.
 #define ARC_DEFINE_IRQ_HANDLER(_handler, _page_tables) \
         void __attribute__((naked)) USERSPACE(text) ARC_NAME_IRQ(_handler)() { \
-                __asm__("push 0"); \
+                asm volatile ("push 0"); \
                 ARC_ASM_PUSH_ALL \
-                __asm__("mov ax, 0x10; \
-                         mov ss, ax; \
-                         mov ax, cs; \
-                         cmp ax, [rsp + 160]; \
-                         je 1f; \
-                         swapgs; \
-                         1:"); \
-                __asm__("mov rax, [rax]; \
-                         mov cr3, rax; \
-                         mov rdi, rsp; \
-                         call %1; \
-                         mov ax, cs; \
-                         cmp ax, [rsp + 160]; \
-                         je 1f; \
-                         swapgs; \
-                         1:" :: "a"(&_page_tables), "i"(_handler) :); \
+                asm volatile ("mov ax, 0x10; \
+                               mov ss, ax; \
+                               mov ax, cs; \
+                               cmp ax, [rsp + 160]; \
+                               je 1f; \
+                               swapgs; \
+                               1:"); \
+                asm volatile ("mov rax, [rax]; \
+                               mov cr3, rax; \
+                               mov rdi, rsp; \
+                               call %1; \
+                               mov ax, cs; \
+                               cmp ax, [rsp + 160]; \
+                               je 1f; \
+                               swapgs; \
+                               1:" :: "a"(&_page_tables), "i"(_handler) :); \
                 ARC_ASM_POP_ALL \
-                __asm__("add rsp, 8;\
-                         iretq"); \
+                asm volatile ("add rsp, 8;\
+                               iretq"); \
         }
 
 typedef struct ARC_IDTEntry {
