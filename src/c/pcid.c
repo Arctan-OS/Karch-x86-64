@@ -35,6 +35,8 @@
 #include "mm/allocator.h"
 #include "util.h"
 
+// TODO: Per processor?
+
 static uint64_t *pcid_bmp = NULL;
 static int pcid_last_free = 0;
 static ARC_Spinlock mod_lock;

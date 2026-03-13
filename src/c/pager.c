@@ -203,6 +203,12 @@ static int pager_traverse(struct pager_traverse_info *info, int (*callback)(stru
 		return -1;
 	}
 
+        if (ARC_CHECK_FEATURE(paging, ARC_PAGER_FLAG_PCID)) {
+                info->cur_table =  (uint64_t *)((uintptr_t)info->cur_table  & ~0xFFF);
+                info->dest_table = (uint64_t *)((uintptr_t)info->dest_table & ~0xFFF);
+                info->src_table =  (uint64_t *)((uintptr_t)info->src_table  & ~0xFFF);
+        }
+        
 	info->size = ALIGN_UP(info->size, PAGE_SIZE);
 
 	while (info->size) {
@@ -481,12 +487,6 @@ int pager_set_attr(void *page_tables, uintptr_t virtual, size_t size, uint32_t a
 	return 0;
 }
 
-// ERROR: When servicing a fault and needing to clone a userspace entry,
-//        the following output is given:
-//        pml4=0xffffc00255612002
-//        pml3=0x0000800000025000
-//        pml3=0x0000400000025000
-
 static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *table, int index, int level) {
 	if (info == NULL || table == NULL || level == 0) {
 		return -1;
@@ -494,18 +494,12 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
         bool A = true;
         
-//	printf("pml4=%p\n", info->src_table);
-
 	uint64_t *pml3 = NULL;
 	if ((pml3 = (uint64_t *)(info->src_table[info->pml4e] & ADDRESS_MASK)) == NULL) {
 		return 0;
 	}
 
-//	printf("pml3=%p\n", pml3);
-
 	pml3 = (uint64_t *)ARC_PHYS_TO_HHDM(pml3);
-
-//	printf("pml3=%p\n", pml3);
 
 	uint64_t *pml2 = NULL;
 	if ((pml2 = (uint64_t *)(pml3[info->pml3e] & ADDRESS_MASK)) == NULL) {
@@ -524,7 +518,6 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 	}
 
 	pml2 = (uint64_t *)ARC_PHYS_TO_HHDM(pml2);
-//	printf("pml2=%p\n", pml3);
 
 	uint64_t *pml1 = NULL;
 	if ((pml1 = (uint64_t *)(pml2[info->pml2e] & ADDRESS_MASK)) == NULL) {
@@ -544,8 +537,6 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	pml1 = (uint64_t *)ARC_PHYS_TO_HHDM(pml1);
 
-//	printf("pml2=%p\n", pml1);
-
 	if ((pml1[info->pml1e] & ADDRESS_MASK) == 0) {
 		return 0;
 	}
@@ -561,7 +552,7 @@ static int pager_clone_callback(struct pager_traverse_info *info, uint64_t *tabl
 
 	basic_quit:;
 
-	if (info->dest_table == info->cur_table) {
+	if (info->dest_table == info->cur_table && A) {
 		__asm__("invlpg %0" : : "m"(info->virtual) : );
 	}
 
