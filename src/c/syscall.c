@@ -36,17 +36,18 @@
 #include <stdint.h>
 #include "arch/convention.h"
 #include "config.h"
+#include "userspace/thread.h"
 
+// TODO: These functions are not super awesome. We are really praying to GCC that it
+//       only clobbers RAX and doesn't touch any other value. Look for some way to assure
+//       that is the case always, or some way to do these functions in assembly.
 uintptr_t USERSPACE(text) syscall_get_kpages() {
 	return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel);
 }
 
-void * USERSPACE(text) syscall_get_stack() {
-        return conv_get_stack(ARC_SYSCALL_STACK_SIZE);
-}
-
-void USERSPACE(text) syscall_free_stack(void *address) {
-        conv_free_stack(address, ARC_SYSCALL_STACK_SIZE);
+uintptr_t USERSPACE(text) syscall_get_kstack() {
+        ARC_Thread *thread = Arc_CurProcessorDescriptor->descriptor.thread;
+	return STACK_START(thread->kstack.hhdm, thread->kstack.size, 16);
 }
 
 extern int _syscall();

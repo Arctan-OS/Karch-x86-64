@@ -1,5 +1,5 @@
 /**
- * @file sysv.h
+ * @file sysv.c
  *
  * @author awewsomegamer <awewsomegamer@gmail.com>
  *
@@ -27,6 +27,7 @@
 #ifdef ARC_TARGET_CONV_SYSV
 
 #include "arch/convention.h"
+#include "arch/x86-64/convention/sysv.h"
 #include "global.h"
 #include "lib/util.h"
 #include "mm/pmm.h"
@@ -51,7 +52,7 @@
 #define STACK_PUSH(__rsp, __val) __rsp[0] = __val; __rsp -= 8;
 
 int conv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
-        uint64_t *rsp = (uint64_t *)thread->stack.phys + thread->stack.size - 16;
+        uint64_t *rsp = (uint64_t *)STACK_START(thread->ustack.phys, thread->ustack.size, 16);
         uint64_t *rbp = rsp;
 
         if (rsp == NULL) {

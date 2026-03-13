@@ -32,6 +32,7 @@
 #include "arch/interrupt.h"
 #include "arch/syscall.h"
 #include "arch/x86-64/apic/local.h"
+#include "arch/x86-64/convention/sysv.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/gdt.h"
 #include "arch/x86-64/interrupt.h"
@@ -105,11 +106,16 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 
 	uintptr_t ist1 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
 	uintptr_t rsp0 = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
-
+        
+        current->ist1 = ist1;
+        
+        ist1 = STACK_START(ist1, ARC_STD_KSTACK_SIZE, 16);
+        rsp0 = STACK_START(rsp0, ARC_STD_KSTACK_SIZE, 16);
+        
 	ARC_TSSDescriptor *tss = &current->proc_structs.tss;
 	ARC_GDTRegister *gdtr = &current->proc_structs.gdtr;
 
-	if (init_static_tss(tss, ist1 + ARC_STD_KSTACK_SIZE - 16, rsp0 + ARC_STD_KSTACK_SIZE - 16) != 0) {
+	if (init_static_tss(tss, ist1, rsp0) != 0) {
 		ARC_DEBUG(ERR, "Failed to create TSS\n");
 		ARC_HANG;
 	}
@@ -140,27 +146,6 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
         interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
 	interrupt_load(idtr);
 
-        // This somehow gets corrupted?
-	current->ist1 = ist1;
-	current->rsp0 = rsp0;
-	current->syscall.base = (uintptr_t)alloc(ARC_STD_KSTACK_SIZE);
-        current->syscall.ptr = current->syscall.base;
-        
-	if (current->syscall.base == 0) {
-		ARC_DEBUG(ERR, "Failed to allocate syscall stack\n");
-		ARC_HANG;
-	}
-
-        uintptr_t syscall_stack0 = (uintptr_t)alloc(ARC_SYSCALL_STACK_SIZE);
-
-        if (syscall_stack0 == 0) {
-                ARC_DEBUG(ERR, "Failed to allocate first syscall stack\n");
-                ARC_HANG;
-        }
-
-        *(uintptr_t *)current->syscall.ptr = syscall_stack0;
-        current->syscall.ptr += sizeof(uintptr_t);
-        
 	if (init_syscall() != 0) {
 		ARC_DEBUG(ERR, "Failed to initialize syscalls\n");
 		ARC_HANG;
@@ -250,8 +235,6 @@ int smp_map_processor_structures(void *page_tables) {
                 }
                 
 		pager_map(page_tables, (uintptr_t)desc->ist1, ARC_HHDM_TO_PHYS(desc->ist1), ARC_STD_KSTACK_SIZE, flags);
-		pager_map(page_tables, (uintptr_t)desc->rsp0, ARC_HHDM_TO_PHYS(desc->rsp0), ARC_STD_KSTACK_SIZE, flags);
-		pager_map(page_tables, (uintptr_t)desc->syscall.base, ARC_HHDM_TO_PHYS(desc->syscall.base), ARC_STD_KSTACK_SIZE, flags);
 
 		ARC_DEBUG(INFO, "Cloned mappings for processor-specific structures to table %p for processor %d\n", page_tables, i);
 	}

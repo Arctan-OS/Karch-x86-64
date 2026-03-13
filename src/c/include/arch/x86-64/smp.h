@@ -35,12 +35,6 @@
 #include "arctan.h"
 
 typedef struct ARC_x64ProcessorDescriptor {
-        struct {
-                uintptr_t ptr;
-                uintptr_t base;
-                uint64_t lock;
-        } syscall;
-        uintptr_t rsp0;
         uintptr_t ist1;
         ARC_ProcessorDescriptor descriptor;
         ARC_ProcessorFeatures features;
