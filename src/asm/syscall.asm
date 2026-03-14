@@ -45,9 +45,9 @@ _syscall:
         cli
         swapgs
 
-        push rax                ; + 16
-        mov rax, cr3
         push rax                ; + 8
+        mov rax, cr3
+        push rax                ; + 0
 
         call syscall_get_kpages
         mov cr3, rax
@@ -69,9 +69,9 @@ _syscall:
         
         ;; Invoke handler, set caller's return code
         call [rax]
-        mov qword [rsp + 8], rax
+        mov qword [rsp], rax
 
-        ;; Restore user context
+        ;; Restore user context bar RAX
         POPAQ
         pop rsp
 
