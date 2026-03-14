@@ -61,10 +61,9 @@ _syscall:
         PUSHAQ                  ; Save user context       
         
         ;; Figure out what handler to call
-        shl rax, 3
         mov r12, Arc_SyscallTable
-        add rax, r12
-
+        lea rax, [r12 + rax * 8]
+        
         sti
         
         ;; Invoke handler, set caller's return code
