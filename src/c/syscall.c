@@ -38,16 +38,22 @@
 #include "config.h"
 #include "userspace/thread.h"
 
-// TODO: These functions are not super awesome. We are really praying to GCC that it
-//       only clobbers RAX and doesn't touch any other value. Look for some way to assure
-//       that is the case always, or some way to do these functions in assembly.
-uintptr_t USERSPACE(text) syscall_get_kpages() {
-	return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel);
+uintptr_t __attribute__((naked)) USERSPACE(text) syscall_get_kpages() {
+        // "return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel);"
+        asm volatile ("push rdx");
+        asm volatile ("add rax, rdx;\
+                       pop rdx;\
+                       ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel), "d"(SIZE_MAX - ARC_HHDM_VADDR + 1) :);
 }
 
-uintptr_t USERSPACE(text) syscall_get_kstack() {
-        ARC_Thread *thread = Arc_CurProcessorDescriptor->descriptor.thread;
-	return STACK_START(thread->kstack.hhdm, thread->kstack.size, 16);
+uintptr_t __attribute__((naked)) USERSPACE(text) syscall_get_kstack() {
+        // "ARC_Thread *thread = Arc_CurProcessorDescriptor->descriptor.thread;
+	//  return STACK_START(thread->kstack.hhdm, thread->kstack.size, 16);"
+        asm volatile ("push rdx");
+        asm volatile ("lea rax, [rax+rdx-16];\
+                       pop rdx;\
+                       ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.hhdm),
+                                 "d"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.size) :);
 }
 
 extern int _syscall();
