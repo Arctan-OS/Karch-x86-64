@@ -60,7 +60,7 @@ extern ARC_x64ProcessorDescriptor *Arc_ProcessorList;
 extern ARC_x64ProcessorDescriptor *Arc_BootProcessor;
 
 // The current processor descriptor
-extern ARC_x64ProcessorDescriptor *Arc_CurProcessorDescriptor;
+extern ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor;
 
 /**
  * Set the processor descriptor

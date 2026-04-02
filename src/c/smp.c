@@ -81,7 +81,7 @@ extern uint8_t _AP_START_INFO;
 
 ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
 ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
-USERSPACE(bss) ARC_x64ProcessorDescriptor __attribute__((address_space(256))) *Arc_CurProcessorDescriptor = NULL;
+USERSPACE(bss) ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor = NULL;
 USERSPACE(bss) uint32_t Arc_ProcessorCounter = 0;
 
 void smp_hold() {
