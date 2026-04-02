@@ -32,6 +32,7 @@
 #include "arch/interrupt.h"
 #include "arch/syscall.h"
 #include "arch/x86-64/apic/local.h"
+#include "arch/x86-64/context.h"
 #include "arch/x86-64/convention/sysv.h"
 #include "arch/x86-64/ctrl_regs.h"
 #include "arch/x86-64/gdt.h"
@@ -80,7 +81,7 @@ extern uint8_t _AP_START_INFO;
 
 ARC_x64ProcessorDescriptor *Arc_ProcessorList = NULL;
 ARC_x64ProcessorDescriptor *Arc_BootProcessor = NULL;
-USERSPACE(bss) ARC_x64ProcessorDescriptor __seg_gs *Arc_CurProcessorDescriptor = NULL;
+USERSPACE(bss) ARC_x64ProcessorDescriptor __attribute__((address_space(256))) *Arc_CurProcessorDescriptor = NULL;
 USERSPACE(bss) uint32_t Arc_ProcessorCounter = 0;
 
 void smp_hold() {
@@ -143,7 +144,7 @@ static int smp_register_ap(uint32_t acpi_uid, uint32_t acpi_flags) {
 	}
 
 	internal_init_early_exceptions((ARC_IDTEntry *)idtr->base, 0x8, 1);
-        interrupt_set(idtr, 32, ARC_NAME_IRQ(sched_timer_hook), true);
+        interrupt_set(idtr, 32, (void (*)(ARC_InterruptFrame *))ARC_NAME_IRQ(sched_timer_hook), true);
 	interrupt_load(idtr);
 
 	if (init_syscall() != 0) {
