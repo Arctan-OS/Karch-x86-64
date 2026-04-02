@@ -65,15 +65,15 @@ void context_save(ARC_Context *ctx, ARC_InterruptFrame *new) {
         // NOTE: TCB does not need to be saved here, that is done in
         //       context_set_tcb
         if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
-                asm volatile ("xor rax, rax;                          \
-                               dec rax;                               \
-                               mov rdx, rax;                            \
-                               xsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                __asm__ volatile ("xor rax, rax;                          \
+                                   dec rax;                               \
+                                   mov rdx, rax;                            \
+                                   xsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
-                 asm volatile ("xor rax, rax; \
-                                dec rax;                                       \
-                                mov rdx, rax;                                  \
-                                fxsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                 __asm__ volatile ("xor rax, rax; \
+                                    dec rax;                                       \
+                                    mov rdx, rax;                                  \
+                                    fxsave [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         }
 }
 
@@ -82,15 +82,15 @@ void context_load(ARC_Context *ctx, ARC_InterruptFrame *to) {
         _x86_WRMSR(FS_BASE_MSR, (uintptr_t)ctx->tcb);
         
         if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_XSAVE)) {
-                asm volatile ("xor rax, rax; \
+                __asm__ volatile ("xor rax, rax; \
                                dec rax;                                       \
                                mov rdx, rax;                                  \
                                xrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         } else if (ARC_CHECK_FEATURE(proc0, ARC_PROC0_FLAG_FXSAVE)){
-                asm volatile ("xor rax, rax; \
-                               dec rax;                                       \
-                               mov rdx, rax;                                  \
-                               fxrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
+                __asm__ volatile ("xor rax, rax; \
+                                   dec rax;                                       \
+                                   mov rdx, rax;                                  \
+                                   fxrstor [%0];" :: "r"(ctx->xsave_space) : "rax", "rdx");
         }
 }
 

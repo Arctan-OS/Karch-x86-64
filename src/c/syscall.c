@@ -40,20 +40,20 @@
 
 uintptr_t __attribute__((naked)) USERSPACE(text) syscall_get_kpages() {
         // "return ARC_HHDM_TO_PHYS(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel);"
-        asm volatile ("push rdx");
-        asm volatile ("add rax, rdx;\
-                       pop rdx;\
-                       ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel), "d"(SIZE_MAX - ARC_HHDM_VADDR + 1) :);
+        __asm__ volatile ("push rdx");
+        __asm__ volatile ("add rax, rdx;\
+                           pop rdx;\
+                           ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.process->page_tables.kernel), "d"(SIZE_MAX - ARC_HHDM_VADDR + 1) :);
 }
 
 uintptr_t __attribute__((naked)) USERSPACE(text) syscall_get_kstack() {
         // "ARC_Thread *thread = Arc_CurProcessorDescriptor->descriptor.thread;
 	//  return STACK_START(thread->kstack.hhdm, thread->kstack.size, 16);"
-        asm volatile ("push rdx");
-        asm volatile ("lea rax, [rax+rdx-16];\
-                       pop rdx;\
-                       ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.hhdm),
-                                 "d"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.size) :);
+        __asm__ volatile ("push rdx");
+        __asm__ volatile ("lea rax, [rax+rdx-16];\
+                           pop rdx;\
+                           ret;" : : "a"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.hhdm),
+                                     "d"(Arc_CurProcessorDescriptor->descriptor.thread->kstack.size) :);
 }
 
 extern int _syscall();

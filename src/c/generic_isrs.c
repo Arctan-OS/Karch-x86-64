@@ -231,7 +231,7 @@ GENERIC_HANDLER(14) {
 
         if (frame->cs == 0x8 && frame->gpr.cr3 == ARC_HHDM_TO_PHYS(kernel)) {
                 int r = 0;
-
+                
                 if (vaddr >= ARC_HHDM_VADDR && vaddr <= (uintptr_t)&__KERNEL_START__) {
                         r = pager_map((void *)kernel, vaddr, ARC_HHDM_TO_PHYS(vaddr),
                                   PAGE_SIZE, 1 << ARC_PAGER_RW | 1 << ARC_PAGER_NX);
