@@ -24,6 +24,7 @@
  *
  * @DESCRIPTION
 */
+#include "userspace/loader.h"
 #ifdef ARC_TARGET_CONV_SYSV
 
 #include "arch/convention.h"
@@ -51,7 +52,7 @@
 
 #define STACK_PUSH(__rsp, __val) __rsp[0] = __val; __rsp -= 8;
 
-int conv_prepare_entry_stack(ARC_Thread *thread, struct ARC_ELFMeta *meta, char **env, int envc, char **argv, int argc) {
+int conv_prepare_entry_stack(ARC_Thread *thread, ARC_ProgramMeta *meta, char **env, int envc, char **argv, int argc) {
         uint64_t *rsp = (uint64_t *)STACK_START(thread->ustack.phys, thread->ustack.size, 16);
         uint64_t *rbp = rsp;
 
