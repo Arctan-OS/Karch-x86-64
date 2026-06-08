@@ -6,7 +6,7 @@
  *
  * @LICENSE
  * Arctan-OS/Karch-x86-64 - x86-64 Implementation of K/arch Abstractions
- * Copyright (C) 2023-2025 awewsomegamer
+ * Copyright (C) 2023-2026 awewsomegamer
  *
  * This file is part of Arctan-OS/Karch-x86-64.
  *

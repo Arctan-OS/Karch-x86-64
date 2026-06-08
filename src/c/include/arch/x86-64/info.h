@@ -5,7 +5,7 @@
  *
  * @LICENSE
  * Arctan-OS/Karch - Abstract Definition, Declaration of Architecture Functions
- * Copyright (C) 2023-2025 awewsomegamer
+ * Copyright (C) 2023-2026 awewsomegamer
  *
  * This file is part of Arctan-OS/Karch.
  *
